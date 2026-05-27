@@ -1,0 +1,145 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC } from '@shared/ipc-channels'
+import { BoardState, SessionInfo, ThemeOverrides, CustomTheme } from '@shared/models'
+
+const api = {
+  // Board
+  loadBoard: (): Promise<BoardState> => ipcRenderer.invoke(IPC.BOARD_LOAD),
+  saveBoard: (state: BoardState): Promise<void> => ipcRenderer.invoke(IPC.BOARD_SAVE, state),
+
+  // Dialog
+  pickFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.DIALOG_PICK_FOLDER),
+
+  // Session
+  startSession: (args: {
+    cardId: string
+    cardTitle: string
+    projectDir: string
+    claudeSessionId?: string | null
+  }): Promise<SessionInfo> => ipcRenderer.invoke(IPC.SESSION_START, args),
+
+  stopSession: (sessionId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.SESSION_STOP, sessionId),
+
+  writeSession: (sessionId: string, data: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.SESSION_WRITE, sessionId, data),
+
+  resizeSession: (sessionId: string, cols: number, rows: number): Promise<void> =>
+    ipcRenderer.invoke(IPC.SESSION_RESIZE, sessionId, cols, rows),
+
+  getSessionBuffer: (sessionId: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.SESSION_BUFFER, sessionId),
+
+  listSessions: (): Promise<SessionInfo[]> => ipcRenderer.invoke(IPC.SESSION_LIST),
+
+  getSessionCwd: (sessionId: string): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.SESSION_CWD, sessionId),
+
+  // Git
+  getGitStatus: (
+    projectDir: string,
+    sessionId?: string
+  ): Promise<{ branch: string; files: { path: string; status: string }[] }> =>
+    ipcRenderer.invoke(IPC.GIT_STATUS, projectDir, sessionId),
+
+  getGitDiff: (projectDir: string, filePath: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.GIT_DIFF, projectDir, filePath),
+
+  // Stats
+  getTodayStats: (): Promise<{
+    date: string
+    tokens: number
+    messages: number
+    sessions: number
+    toolCalls: number
+  }> => ipcRenderer.invoke(IPC.STATS_TODAY),
+
+  // Settings
+  loadSettings: (): Promise<{
+    defaultProjectDir: string
+    rules: string[]
+    pats: { id: string; name: string; value: string }[]
+    theme: 'dark' | 'light'
+    themeOverrides: ThemeOverrides
+    customThemes: CustomTheme[]
+    activeCustomThemeId: string | null
+  }> => ipcRenderer.invoke(IPC.SETTINGS_LOAD),
+  saveSettings: (settings: {
+    defaultProjectDir: string
+    rules: string[]
+    pats: { id: string; name: string; value: string }[]
+    theme: 'dark' | 'light'
+    themeOverrides: ThemeOverrides
+    customThemes: CustomTheme[]
+    activeCustomThemeId: string | null
+  }): Promise<void> => ipcRenderer.invoke(IPC.SETTINGS_SAVE, settings),
+  changeTheme: (theme: 'dark' | 'light'): Promise<void> =>
+    ipcRenderer.invoke(IPC.THEME_CHANGE, theme),
+  addRule: (rule: string): Promise<string[]> =>
+    ipcRenderer.invoke(IPC.SETTINGS_ADD_RULE, rule),
+  importTheme: (): Promise<Record<string, unknown> | null> =>
+    ipcRenderer.invoke(IPC.THEME_IMPORT),
+  exportTheme: (themeJson: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.THEME_EXPORT, themeJson),
+  openFile: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke(IPC.OPEN_FILE, filePath),
+
+  // App / Update
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke(IPC.APP_VERSION),
+  checkForUpdate: (): Promise<unknown> => ipcRenderer.invoke(IPC.UPDATE_CHECK),
+  downloadUpdate: (): Promise<unknown> => ipcRenderer.invoke(IPC.UPDATE_DOWNLOAD),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke(IPC.UPDATE_INSTALL),
+  onUpdateStatus: (
+    callback: (data: { status: string; version?: string; percent?: number; message?: string }) => void
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { status: string; version?: string; percent?: number; message?: string }
+    ): void => {
+      callback(data)
+    }
+    ipcRenderer.on(IPC.UPDATE_STATUS, handler)
+    return () => ipcRenderer.removeListener(IPC.UPDATE_STATUS, handler)
+  },
+
+  // Session event listeners
+  onSessionData: (callback: (sessionId: string, data: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, sessionId: string, data: string): void => {
+      callback(sessionId, data)
+    }
+    ipcRenderer.on(IPC.SESSION_DATA, handler)
+    return () => ipcRenderer.removeListener(IPC.SESSION_DATA, handler)
+  },
+
+  onSessionExit: (
+    callback: (sessionId: string, code: number | undefined) => void
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      sessionId: string,
+      code: number | undefined
+    ): void => {
+      callback(sessionId, code)
+    }
+    ipcRenderer.on(IPC.SESSION_EXIT, handler)
+    return () => ipcRenderer.removeListener(IPC.SESSION_EXIT, handler)
+  },
+
+  onClaudeSessionId: (
+    callback: (sessionId: string, claudeConversationId: string) => void
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      sessionId: string,
+      claudeConversationId: string
+    ): void => {
+      callback(sessionId, claudeConversationId)
+    }
+    ipcRenderer.on(IPC.SESSION_CLAUDE_ID, handler)
+    return () => ipcRenderer.removeListener(IPC.SESSION_CLAUDE_ID, handler)
+  }
+}
+
+export type Api = typeof api
+
+contextBridge.exposeInMainWorld('api', api)
