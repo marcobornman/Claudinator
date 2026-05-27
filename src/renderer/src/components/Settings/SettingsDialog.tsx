@@ -108,31 +108,41 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' })
 
   useEffect(() => {
-    window.api.getAppVersion().then(setAppVersion)
-    const unsub = window.api.onUpdateStatus((data) => {
-      switch (data.status) {
-        case 'checking':
-          setUpdateStatus({ state: 'checking' })
-          break
-        case 'available':
-          setUpdateStatus({ state: 'available', version: data.version ?? '' })
-          break
-        case 'up-to-date':
-          setUpdateStatus({ state: 'up-to-date' })
-          break
-        case 'downloading':
-          setUpdateStatus({ state: 'downloading', percent: data.percent ?? 0 })
-          break
-        case 'ready':
-          setUpdateStatus({ state: 'ready', version: data.version ?? '' })
-          break
-        case 'error':
-          setUpdateStatus({ state: 'error', message: data.message ?? 'Unknown error' })
-          break
-      }
-    })
-    return unsub
-  }, [])
+    if (activeSection !== 'about') return
+
+    let unsub: (() => void) | undefined
+
+    try {
+      window.api.getAppVersion().then(setAppVersion).catch(() => {})
+
+      unsub = window.api.onUpdateStatus((data) => {
+        switch (data.status) {
+          case 'checking':
+            setUpdateStatus({ state: 'checking' })
+            break
+          case 'available':
+            setUpdateStatus({ state: 'available', version: data.version ?? '' })
+            break
+          case 'up-to-date':
+            setUpdateStatus({ state: 'up-to-date' })
+            break
+          case 'downloading':
+            setUpdateStatus({ state: 'downloading', percent: data.percent ?? 0 })
+            break
+          case 'ready':
+            setUpdateStatus({ state: 'ready', version: data.version ?? '' })
+            break
+          case 'error':
+            setUpdateStatus({ state: 'error', message: data.message ?? 'Unknown error' })
+            break
+        }
+      })
+    } catch {
+      // API not available (e.g. preload not reloaded)
+    }
+
+    return () => unsub?.()
+  }, [activeSection])
 
   // What are we editing?
   const editingIsBase = editingThemeId === 'dark' || editingThemeId === 'light'
@@ -828,7 +838,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                   {updateStatus.state === 'idle' && (
                     <button
                       type="button"
-                      onClick={() => window.api.checkForUpdate()}
+                      onClick={() => window.api.checkForUpdate?.()}
                       style={{
                         ...smallBtnStyle,
                         width: '100%',
@@ -853,7 +863,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                   {updateStatus.state === 'available' && (
                     <button
                       type="button"
-                      onClick={() => window.api.downloadUpdate()}
+                      onClick={() => window.api.downloadUpdate?.()}
                       style={{
                         ...smallBtnStyle,
                         width: '100%',
@@ -893,7 +903,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                   {updateStatus.state === 'ready' && (
                     <button
                       type="button"
-                      onClick={() => window.api.installUpdate()}
+                      onClick={() => window.api.installUpdate?.()}
                       style={{
                         ...smallBtnStyle,
                         width: '100%',

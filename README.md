@@ -86,12 +86,21 @@ electron-builder.yml # Packaging config
 
 The app checks for updates from [GitHub Releases](https://github.com/Sinofdreams/Claudinator/releases) via `electron-updater`. Open **Settings > About** and click **Check for Updates**. Downloads are user-initiated -- nothing happens automatically in the background.
 
-To publish a release:
+### Publishing a release
 
-1. Bump the version in `package.json`.
+1. Bump the `version` in `package.json` (e.g., `0.1.0` -> `0.2.0`).
 2. Run `npm run package:win`.
-3. Create a new GitHub Release with the tag matching the version (e.g., `v0.2.0`).
-4. Upload the installer `.exe` and the `latest.yml` file from the `dist/` directory.
+3. Go to [GitHub Releases](https://github.com/Sinofdreams/Claudinator/releases) and create a new release.
+4. Set the tag to match the version (e.g., `v0.2.0`).
+5. Upload **both** files from the `dist/` directory:
+   - `claude-orchestrator-<version>-setup.exe` -- the installer
+   - `latest.yml` -- **required** for auto-update detection; `electron-updater` reads this file to determine if a newer version is available
+
+> **Important:** If you forget to upload `latest.yml`, existing installations will not detect the new release. Always upload both files.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full list of changes per version.
 
 ## License
 
