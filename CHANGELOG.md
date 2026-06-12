@@ -4,6 +4,14 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.3] - 2026-06-12
+
+### Fixed
+- Dim the title-bar caption buttons while a full-screen modal is open, so the OS-drawn button strip no longer stays bright over the dimmed backdrop (session modal, settings, card dialog, delete confirmation).
+
+### Changed
+- Make "Check for Updates" testable in development: `electron-updater` now reads `dev-app-update.yml` and forces the dev update config when unpackaged.
+
 ## [0.1.0] - 2026-05-27
 
 ### Added
