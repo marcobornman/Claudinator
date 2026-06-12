@@ -82,6 +82,8 @@ const api = {
   }): Promise<void> => ipcRenderer.invoke(IPC.SETTINGS_SAVE, settings),
   changeTheme: (theme: 'dark' | 'light'): Promise<void> =>
     ipcRenderer.invoke(IPC.THEME_CHANGE, theme),
+  setTitleBarDim: (dimmed: boolean): Promise<void> =>
+    ipcRenderer.invoke(IPC.TITLEBAR_DIM, dimmed),
   addRule: (rule: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC.SETTINGS_ADD_RULE, rule),
   importTheme: (): Promise<Record<string, unknown> | null> =>

@@ -49,6 +49,7 @@ export const IPC = {
   THEME_CHANGE: 'theme:change',
   THEME_IMPORT: 'theme:import',
   THEME_EXPORT: 'theme:export',
+  TITLEBAR_DIM: 'titlebar:dim',
 
   // File
   OPEN_FILE: 'file:open',
