@@ -56,6 +56,31 @@ interface TerminalViewProps {
   isVisible: boolean
 }
 
+// Fit the terminal to its container and report the new size to the PTY — but
+// ONLY when the element is actually laid out. A display:none / zero-width
+// terminal makes FitAddon fall back to its 2-column minimum; pushing that to the
+// PTY makes Claude Code wrap its output to ~2 characters wide. Guarding on a real
+// box (and a sane column floor) keeps a hidden tab from poisoning the PTY size.
+function fitAndResize(
+  el: HTMLDivElement | null,
+  term: Terminal | null,
+  fit: FitAddon | null,
+  sessionId: string
+): void {
+  if (!el || !term || !fit) return
+  // offsetParent === null → display:none (or an ancestor is); clientWidth ~0 →
+  // not laid out yet. Either way, don't trust the measurement.
+  if (el.offsetParent === null || el.clientWidth < 40 || el.clientHeight < 20) return
+  try {
+    fit.fit()
+    if (term.cols >= 10 && term.rows >= 4) {
+      window.api.resizeSession(sessionId, term.cols, term.rows)
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export default function TerminalView({ sessionId, isVisible }: TerminalViewProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -87,17 +112,16 @@ export default function TerminalView({ sessionId, isVisible }: TerminalViewProps
     terminal.loadAddon(fitAddon)
     terminal.open(containerRef.current)
 
-    // Small delay for DOM to be ready
-    requestAnimationFrame(() => {
-      try {
-        fitAddon.fit()
-      } catch {
-        // ignore
-      }
-    })
-
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
+
+    // Small delay for DOM to be ready, then size to the container.
+    requestAnimationFrame(() => fitAndResize(containerRef.current, terminal, fitAddon, sessionId))
+    // Re-fit once webfonts finish loading — the monospace cell metrics (and thus
+    // the computed column count) can change after the first measurement.
+    document.fonts?.ready?.then(() =>
+      fitAndResize(containerRef.current, terminal, fitAddon, sessionId)
+    )
 
     // Dim the terminal when it doesn't have keyboard focus (or the window is
     // blurred), so it's clear which terminal is active and the CLI's drawn input
@@ -206,12 +230,7 @@ export default function TerminalView({ sessionId, isVisible }: TerminalViewProps
 
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
-      try {
-        fitAddon.fit()
-        window.api.resizeSession(sessionId, terminal.cols, terminal.rows)
-      } catch {
-        // ignore
-      }
+      fitAndResize(containerRef.current, terminal, fitAddon, sessionId)
     })
     resizeObserver.observe(containerRef.current)
 
@@ -229,22 +248,15 @@ export default function TerminalView({ sessionId, isVisible }: TerminalViewProps
     }
   }, [sessionId])
 
-  // Refit when visibility changes
+  // Refit when this terminal becomes visible (tab switch / modal open). The tab
+  // was display:none while hidden, so its size is only trustworthy now.
   useEffect(() => {
-    if (isVisible && fitAddonRef.current) {
-      requestAnimationFrame(() => {
-        try {
-          fitAddonRef.current?.fit()
-          if (terminalRef.current) {
-            window.api.resizeSession(sessionId, terminalRef.current.cols, terminalRef.current.rows)
-            // Focus the CLI so the user can type immediately on open
-            terminalRef.current.focus()
-          }
-        } catch {
-          // ignore
-        }
-      })
-    }
+    if (!isVisible) return
+    requestAnimationFrame(() => {
+      fitAndResize(containerRef.current, terminalRef.current, fitAddonRef.current, sessionId)
+      // Focus the CLI so the user can type immediately on open.
+      terminalRef.current?.focus()
+    })
   }, [isVisible, sessionId])
 
   return (

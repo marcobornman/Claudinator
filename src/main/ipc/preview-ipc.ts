@@ -75,4 +75,13 @@ export function registerPreviewIpc(): void {
   ipcMain.handle(IPC.PREVIEW_CLOSE, () => {
     if (previewWindow && !previewWindow.isDestroyed()) previewWindow.close()
   })
+
+  // Popout's refresh button → tell the editor window(s) to reload the note from
+  // disk and re-stream it. Skip the preview window itself.
+  ipcMain.on(IPC.PREVIEW_REFRESH, () => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (previewWindow && win.id === previewWindow.id) continue
+      win.webContents.send(IPC.PREVIEW_REFRESH)
+    }
+  })
 }

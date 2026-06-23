@@ -10,6 +10,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.8',
+    date: '2026-06-23',
+    summary: 'Terminal wrapping fix + popout preview refresh.',
+    highlights: [
+      'Fixed the terminal occasionally wrapping its output to ~2 characters wide — a hidden or not-yet-laid-out session tab could report a tiny width to the CLI. Terminals now only resize when properly visible.',
+      'Added a refresh button to the detached Notes & Docs preview window (top-right) that reloads the note from disk — handy for picking up external edits, like a Claude session writing to the file.'
+    ]
+  },
+  {
     version: '0.1.7',
     date: '2026-06-22',
     summary: 'Filter your usage by time range.',

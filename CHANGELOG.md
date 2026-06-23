@@ -4,6 +4,14 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.8] - 2026-06-23
+
+### Fixed
+- Terminal no longer wraps its output to ~2 characters wide. A hidden/background session tab (or one measured before layout settled) could make the fit addon report a 2-column width to the PTY, so Claude Code rendered everything wrapped to 2–3 characters. The terminal now refuses to fit or resize while it's hidden or not yet laid out, never reports an absurdly small column count, and re-fits once web fonts finish loading.
+
+### Added
+- Refresh button in the detached Notes & Docs preview window (top-right, next to the window controls). Click it to reload the note from disk and re-render — handy for picking up external edits (e.g. a Claude session writing to the `.md`) without switching back to the editor.
+
 ## [0.1.7] - 2026-06-22
 
 ### Added
