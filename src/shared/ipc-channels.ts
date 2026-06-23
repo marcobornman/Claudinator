@@ -73,5 +73,6 @@ export const IPC = {
   PREVIEW_UPDATE: 'preview:update',
   PREVIEW_DATA: 'preview:data',
   PREVIEW_READY: 'preview:ready',
-  PREVIEW_CLOSED: 'preview:closed'
+  PREVIEW_CLOSED: 'preview:closed',
+  PREVIEW_REFRESH: 'preview:refresh'
 } as const

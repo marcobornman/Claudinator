@@ -455,6 +455,19 @@ export default function NotesPanel(): JSX.Element {
     return unsub
   }, [])
 
+  // Popout's refresh button → reload the active note from disk and re-render,
+  // which re-streams to the detached preview (picks up external edits).
+  useEffect(() => {
+    const unsub = window.api.onPreviewRefresh(async () => {
+      const path = activePathRef.current
+      if (!path) return
+      const text = await window.api.readNote(path)
+      setContent(text)
+      await refreshList()
+    })
+    return unsub
+  }, [refreshList])
+
   const togglePreviewPopout = async (): Promise<void> => {
     if (previewPopped) {
       await window.api.closePreview()

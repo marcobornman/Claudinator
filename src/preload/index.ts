@@ -164,6 +164,13 @@ const api = {
     ipcRenderer.on(IPC.PREVIEW_CLOSED, handler)
     return () => ipcRenderer.removeListener(IPC.PREVIEW_CLOSED, handler)
   },
+  // Popout asks the editor to reload the active note from disk and re-stream it.
+  requestPreviewRefresh: (): void => ipcRenderer.send(IPC.PREVIEW_REFRESH),
+  onPreviewRefresh: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on(IPC.PREVIEW_REFRESH, handler)
+    return () => ipcRenderer.removeListener(IPC.PREVIEW_REFRESH, handler)
+  },
 
   // Session event listeners
   onSessionData: (callback: (sessionId: string, data: string) => void): (() => void) => {
