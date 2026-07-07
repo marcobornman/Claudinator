@@ -31,6 +31,7 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
   const [gitPanelWidth, setGitPanelWidth] = useState(340)
   const [branchName, setBranchName] = useState<string | null>(null)
   const [contextInfo, setContextInfo] = useState<string | null>(null)
+  const [sessionCost, setSessionCost] = useState<number | null>(null)
   const isResizing = useRef(false)
 
   const hasProjectDir = Boolean(card?.projectDir)
@@ -105,6 +106,23 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
     const interval = setInterval(fetchContextInfo, 5000)
     return () => clearInterval(interval)
   }, [fetchContextInfo, visible])
+
+  const fetchSessionCost = useCallback(async () => {
+    if (!effectiveDir || !card?.claudeSessionId) return
+    try {
+      const result = await window.api.getSessionCost(effectiveDir, card.claudeSessionId)
+      setSessionCost(result?.cost ?? null)
+    } catch {
+      setSessionCost(null)
+    }
+  }, [effectiveDir, card?.claudeSessionId])
+
+  useEffect(() => {
+    if (!visible) return
+    fetchSessionCost()
+    const interval = setInterval(fetchSessionCost, 15000)
+    return () => clearInterval(interval)
+  }, [fetchSessionCost, visible])
 
   // Close on Escape
   useEffect(() => {
@@ -248,6 +266,28 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
                 )}
 
                 <div className="flex-1" />
+
+                {sessionCost !== null && sessionCost > 0 && (
+                  <div
+                    className="flex items-center shrink-0"
+                    style={{
+                      gap: '6px',
+                      padding: '3px 10px',
+                      borderRadius: 6,
+                      backgroundColor: 'var(--bg-surface)',
+                      border: '1px solid var(--border-primary)',
+                    }}
+                    title="Estimated cost of this conversation (list prices, incl. cache)"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" className="shrink-0" style={{ color: 'var(--text-secondary)' }} strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="8" cy="8" r="6.2" />
+                      <path d="M8 4.8v6.4M10 6.2c-.4-.7-1.1-1-2-1-1.1 0-1.9.6-1.9 1.5C6.1 8.8 10 8 10 9.7c0 .9-.9 1.5-2 1.5-.9 0-1.7-.4-2-1" />
+                    </svg>
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                      {sessionCost < 0.01 ? '<$0.01' : '$' + (sessionCost >= 100 ? sessionCost.toFixed(0) : sessionCost.toFixed(2))}
+                    </span>
+                  </div>
+                )}
 
                 {contextInfo && (
                   <div

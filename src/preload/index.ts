@@ -80,6 +80,11 @@ const api = {
   }> => ipcRenderer.invoke(IPC.STATS_TODAY),
   getStatsSummary: (rangeDays?: number, force?: boolean): Promise<StatsSummary | null> =>
     ipcRenderer.invoke(IPC.STATS_SUMMARY, rangeDays, force),
+  getSessionCost: (
+    sessionDir: string,
+    claudeSessionId: string
+  ): Promise<{ cost: number; tokens: number } | null> =>
+    ipcRenderer.invoke(IPC.STATS_SESSION_COST, sessionDir, claudeSessionId),
 
   // Settings
   loadSettings: (): Promise<{

@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { IPC } from '@shared/ipc-channels'
-import { computeStatsSummary } from '../services/stats-aggregator'
+import { computeStatsSummary, computeSessionCost } from '../services/stats-aggregator'
+import type { SessionCost } from '../services/stats-aggregator'
 import type { StatsSummary } from '@shared/stats'
 
 interface TodayStats {
@@ -28,6 +29,19 @@ export function registerStatsIpc(): void {
       return { date: '', tokens: 0, messages: 0, sessions: 0, toolCalls: 0 }
     }
   })
+
+  // Cost of a single Claude conversation (per-card cost badge).
+  ipcMain.handle(
+    IPC.STATS_SESSION_COST,
+    async (_e, sessionDir: string, claudeSessionId: string): Promise<SessionCost | null> => {
+      if (!sessionDir || !claudeSessionId) return null
+      try {
+        return await computeSessionCost(sessionDir, claudeSessionId)
+      } catch {
+        return null
+      }
+    }
+  )
 
   // Full dashboard summary for a given time window (rangeDays: 0 = all time).
   ipcMain.handle(

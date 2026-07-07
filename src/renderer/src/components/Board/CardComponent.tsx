@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card, SessionStatus } from '@shared/models'
@@ -92,10 +93,16 @@ function getCardStatus(
   return 'idle' // error
 }
 
+function formatCost(cost: number): string {
+  if (cost < 0.01) return '<$0.01'
+  return '$' + (cost >= 100 ? cost.toFixed(0) : cost.toFixed(2))
+}
+
 /** Pure presentational card — no dnd hooks */
 export function CardContent({
   card,
   sessionStatus,
+  cost,
   onEdit,
   onStop,
   onClick,
@@ -106,6 +113,7 @@ export function CardContent({
 }: {
   card: Card
   sessionStatus: SessionStatus | null
+  cost?: number | null
   onEdit?: (e: React.MouseEvent) => void
   onStop?: (e: React.MouseEvent) => void
   onClick?: () => void
@@ -257,6 +265,14 @@ export function CardContent({
           </div>
         )}
         <div className="flex items-center" style={{ gap: 5, marginLeft: 'auto' }}>
+          {cost != null && cost > 0 && (
+            <span
+              style={{ fontSize: 10, color: 'var(--text-faint)', marginRight: 6 }}
+              title="Estimated cost of this card's conversation"
+            >
+              {formatCost(cost)}
+            </span>
+          )}
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
             <rect x="1.5" y="2" width="9" height="7" rx="1.5" />
             <path d="M1.5 4.5h9" />
@@ -291,6 +307,33 @@ export default function CardComponent({ card, onEdit }: CardComponentProps): JSX
 
   const session = card.sessionId ? sessions[card.sessionId] : null
   const sessionStatus = session?.status ?? null
+
+  // Estimated conversation cost, refreshed once a minute. The main process
+  // caches per transcript mtime, so this stays cheap across many cards.
+  const [cost, setCost] = useState<number | null>(null)
+  useEffect(() => {
+    if (!card.claudeSessionId) {
+      setCost(null)
+      return
+    }
+    let alive = true
+    const dir = card.worktreePath || card.projectDir
+    const claudeId = card.claudeSessionId
+    const fetchCost = async (): Promise<void> => {
+      try {
+        const result = await window.api.getSessionCost(dir, claudeId)
+        if (alive) setCost(result?.cost ?? null)
+      } catch {
+        // ignore
+      }
+    }
+    fetchCost()
+    const interval = setInterval(fetchCost, 60000)
+    return () => {
+      alive = false
+      clearInterval(interval)
+    }
+  }, [card.claudeSessionId, card.worktreePath, card.projectDir])
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -328,6 +371,7 @@ export default function CardComponent({ card, onEdit }: CardComponentProps): JSX
     <CardContent
       card={card}
       sessionStatus={sessionStatus}
+      cost={cost}
       onEdit={handleEditClick}
       onStop={handleStopClick}
       onClick={handleCardClick}
