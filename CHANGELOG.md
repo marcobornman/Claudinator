@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [0.1.14] - 2026-07-13
 
 ### Added
+- Notes & Docs folders start minimized. Folders you expand stay open for the session, and the tree auto-reveals a folder when you create something inside it, drop an item into it, or open one of its notes from search. Folders stay on top; notes keep sorting newest-first.
 - Shift+Esc closes the card view even while the terminal has focus. Plain Esc stays with the CLI — it interrupts generation, dequeues queued messages, dismisses menus, and Esc-Esc opens history rewind.
 - A floating jump-to-bottom button appears in the terminal whenever you're scrolled up; clicking it scrolls to the bottom, repaints the viewport, and refocuses the input.
 

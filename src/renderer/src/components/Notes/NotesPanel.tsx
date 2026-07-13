@@ -112,8 +112,9 @@ export default function NotesPanel(): JSX.Element {
   const [editorPct, setEditorPct] = useState(50)
   const [sessionByNote, setSessionByNote] = useState<Record<string, string>>({})
 
-  // Folder-tree state
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Folder-tree state. Folders start minimized — `expanded` holds the ones the
+  // user opened this session.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
   const [folderRenameValue, setFolderRenameValue] = useState('')
   const [menu, setMenu] = useState<ContextMenu | null>(null)
@@ -257,6 +258,8 @@ export default function NotesPanel(): JSX.Element {
     if (path === activePath) return
     await flushSave()
     await loadNote(path)
+    // Reveal it in the tree (e.g. when opened from search results)
+    expandFolder(parentOf(path))
   }
 
   const handleNewNote = async (folder = activeFolder): Promise<void> => {
@@ -265,6 +268,7 @@ export default function NotesPanel(): JSX.Element {
     const created = await window.api.createNote(base)
     await refreshList()
     await loadNote(created)
+    expandFolder(folder)
     setRenameValue(leafOf(created))
     setRenaming(true)
   }
@@ -273,7 +277,7 @@ export default function NotesPanel(): JSX.Element {
     const base = parent ? `${parent}/New Folder` : 'New Folder'
     const created = await window.api.createFolder(base)
     await refreshList()
-    if (parent) setCollapsed((c) => deleteFrom(c, parent))
+    if (parent) expandFolder(parent)
     // Begin inline rename of the new folder
     setRenamingFolder(created)
     setFolderRenameValue(leafOf(created))
@@ -370,6 +374,7 @@ export default function NotesPanel(): JSX.Element {
   }
 
   const performMove = async (item: DragItem, targetFolder: string): Promise<void> => {
+    expandFolder(targetFolder)
     if (item.kind === 'note') {
       if (parentOf(item.path) === targetFolder) return
       const newPath = await window.api.moveNote(item.path, targetFolder)
@@ -398,7 +403,18 @@ export default function NotesPanel(): JSX.Element {
   }
 
   const toggleCollapse = (path: string): void => {
-    setCollapsed((c) => (c.has(path) ? deleteFrom(c, path) : new Set(c).add(path)))
+    setExpanded((c) => (c.has(path) ? deleteFrom(c, path) : new Set(c).add(path)))
+  }
+
+  // Open a folder (and its ancestors) so freshly created/moved items are visible.
+  const expandFolder = (path: string): void => {
+    if (!path) return
+    setExpanded((c) => {
+      const next = new Set(c)
+      const parts = path.split('/')
+      for (let i = 1; i <= parts.length; i++) next.add(parts.slice(0, i).join('/'))
+      return next
+    })
   }
 
   // Vertical resize for the bottom CLI pane (drag up = taller)
@@ -534,7 +550,7 @@ export default function NotesPanel(): JSX.Element {
   )
 
   const renderFolder = (node: FolderNode, depth: number): JSX.Element => {
-    const isCollapsed = collapsed.has(node.path)
+    const isCollapsed = !expanded.has(node.path)
     const isDrop = dropTarget === node.path
     const isRenaming = renamingFolder === node.path
     return (

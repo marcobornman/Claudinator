@@ -16,7 +16,8 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     highlights: [
       'Scrolling long sessions no longer gets stuck just above the bottom — and a floating ↓ button jumps you back down from anywhere in the scrollback.',
       'Shift+Esc closes the card view even while you’re typing in the terminal. Plain Esc stays with the CLI for interrupts and menus.',
-      'The context badge now respects each model’s real context window (Haiku: 200k), so its percentage is meaningful on every model.'
+      'The context badge now respects each model’s real context window (Haiku: 200k), so its percentage is meaningful on every model.',
+      'Notes & Docs folders start minimized and auto-reveal when you create, move, or open something inside them.'
     ]
   },
   {
