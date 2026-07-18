@@ -3,6 +3,7 @@ import { IPC } from '@shared/ipc-channels'
 import {
   BoardState,
   SessionInfo,
+  SessionStatus,
   ThemeOverrides,
   CustomTheme,
   NotesTree,
@@ -249,6 +250,20 @@ const api = {
     }
     ipcRenderer.on(IPC.SESSION_EXIT, handler)
     return () => ipcRenderer.removeListener(IPC.SESSION_EXIT, handler)
+  },
+
+  onSessionStatus: (
+    callback: (sessionId: string, status: SessionStatus) => void
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      sessionId: string,
+      status: SessionStatus
+    ): void => {
+      callback(sessionId, status)
+    }
+    ipcRenderer.on(IPC.SESSION_STATUS, handler)
+    return () => ipcRenderer.removeListener(IPC.SESSION_STATUS, handler)
   },
 
   onClaudeSessionId: (

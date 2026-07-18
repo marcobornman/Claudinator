@@ -49,6 +49,13 @@ export function registerSessionIpc(): void {
         }
       })
 
+      // Forward attention-status changes (running / waiting / decision / stopped)
+      sessionManager.onStatus(info.id, (status) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IPC.SESSION_STATUS, info.id, status)
+        }
+      })
+
       return info
     }
   )

@@ -18,6 +18,7 @@ export const IPC = {
   SESSION_CWD: 'session:cwd',
   SESSION_CLAUDE_ID: 'session:claude-id',
   SESSION_CONTEXT: 'session:context',
+  SESSION_STATUS: 'session:status',
 
   // Git
   GIT_STATUS: 'git:status',

@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid'
 import { SessionInfo, SessionStatus } from '@shared/models'
 import { buildClaudeArgs } from './claude-cli'
+import { isDecisionPrompt } from './attention'
 import { readFile, writeFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -38,6 +39,9 @@ interface ManagedSession {
   dataListeners: Set<(data: string) => void>
   exitListeners: Set<(code: number | undefined) => void>
   claudeIdListeners: Set<(conversationId: string) => void>
+  statusListeners: Set<(status: SessionStatus) => void>
+  // Attention detection: after 3s of PTY silence, decide waiting vs decision.
+  idleTimer?: ReturnType<typeof setTimeout>
 }
 
 class SessionManager {
@@ -142,7 +146,8 @@ class SessionManager {
       buffer: '',
       dataListeners: new Set(),
       exitListeners: new Set(),
-      claudeIdListeners: new Set()
+      claudeIdListeners: new Set(),
+      statusListeners: new Set()
     }
 
     ptyProcess.onData((data) => {
@@ -155,10 +160,12 @@ class SessionManager {
       for (const listener of managed.dataListeners) {
         listener(data)
       }
+      this.detectAttention(managed)
     })
 
     ptyProcess.onExit(({ exitCode }) => {
-      managed.info.status = 'stopped'
+      this.clearIdleTimer(managed)
+      this.setStatus(managed, 'stopped')
       for (const listener of managed.exitListeners) {
         listener(exitCode)
       }
@@ -191,7 +198,8 @@ class SessionManager {
     } catch {
       // already dead
     }
-    managed.info.status = 'stopped'
+    this.clearIdleTimer(managed)
+    this.setStatus(managed, 'stopped')
     return true
   }
 
@@ -243,6 +251,13 @@ class SessionManager {
     }
     managed.claudeIdListeners.add(listener)
     return () => managed.claudeIdListeners.delete(listener)
+  }
+
+  onStatus(sessionId: string, listener: (status: SessionStatus) => void): () => void {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) return () => {}
+    managed.statusListeners.add(listener)
+    return () => managed.statusListeners.delete(listener)
   }
 
   listSessions(): SessionInfo[] {
@@ -392,7 +407,47 @@ class SessionManager {
     } catch {
       // ignore
     }
+    this.clearIdleTimer(managed)
     this.sessions.delete(sessionId)
+  }
+
+  private setStatus(managed: ManagedSession, status: SessionStatus): void {
+    if (managed.info.status === status) return
+    managed.info.status = status
+    for (const listener of managed.statusListeners) {
+      listener(status)
+    }
+  }
+
+  private clearIdleTimer(managed: ManagedSession): void {
+    if (managed.idleTimer) {
+      clearTimeout(managed.idleTimer)
+      managed.idleTimer = undefined
+    }
+  }
+
+  // Classify the session on every chunk of PTY output: a decision prompt on
+  // screen flags immediately (bounded tail so a resolved prompt clears as soon
+  // as enough new output scrolls in); otherwise output flowing means running,
+  // and after 3s of quiet we decide between decision and waiting.
+  private detectAttention(managed: ManagedSession): void {
+    if (managed.info.status === 'stopped') return
+
+    if (isDecisionPrompt(managed.buffer.slice(-1200))) {
+      this.clearIdleTimer(managed)
+      this.setStatus(managed, 'decision')
+      return
+    }
+
+    this.setStatus(managed, 'running')
+
+    this.clearIdleTimer(managed)
+    managed.idleTimer = setTimeout(() => {
+      managed.idleTimer = undefined
+      if (managed.info.status === 'stopped') return
+      const next = isDecisionPrompt(managed.buffer.slice(-3000)) ? 'decision' : 'waiting'
+      this.setStatus(managed, next)
+    }, 3000)
   }
 }
 
