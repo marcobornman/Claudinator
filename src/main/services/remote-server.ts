@@ -15,15 +15,21 @@ import xtermJs from '@xterm/xterm/lib/xterm.js?raw'
 import xtermCss from '@xterm/xterm/css/xterm.css?raw'
 import iconDataUrl from '../../../build/icon.png?inline'
 
-const MANIFEST = JSON.stringify({
-  name: 'Claudinator',
-  short_name: 'Claudinator',
-  display: 'standalone',
-  start_url: '/',
-  background_color: '#0d1117',
-  theme_color: '#0d1117',
-  icons: [{ src: '/assets/icon.png', sizes: '180x180', type: 'image/png' }]
-})
+// start_url must carry the access token: an installed home-screen app gets
+// fresh isolated storage and launches at start_url (the scanned #fragment is
+// lost), so without this the installed app can't authenticate. The tokenised
+// manifest is only served to callers already presenting the valid token.
+function buildManifest(startUrl: string): string {
+  return JSON.stringify({
+    name: 'Claudinator',
+    short_name: 'Claudinator',
+    display: 'standalone',
+    start_url: startUrl,
+    background_color: '#0d1117',
+    theme_color: '#0d1117',
+    icons: [{ src: '/assets/icon.png', sizes: '180x180', type: 'image/png' }]
+  })
+}
 
 /**
  * Phone remote: a small LAN HTTP + WebSocket server embedded in the main
@@ -240,8 +246,10 @@ class RemoteServer {
       return
     }
     if (url.pathname === '/manifest.webmanifest') {
-      res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'max-age=86400' })
-      res.end(MANIFEST)
+      const t = url.searchParams.get('t')
+      const startUrl = this.checkToken(t) ? `/?t=${encodeURIComponent(t as string)}` : '/'
+      res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' })
+      res.end(buildManifest(startUrl))
       return
     }
 

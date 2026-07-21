@@ -8,7 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Claudinator" />
 <title>Claudinator Remote</title>
-<link rel="manifest" href="/manifest.webmanifest" />
+<!-- The manifest link is injected by script so its URL carries the access
+     token — the tokenised manifest gives the installed app a start_url that
+     can authenticate (see /manifest.webmanifest on the server). -->
 <link rel="apple-touch-icon" href="/assets/icon.png" />
 <link rel="stylesheet" href="/assets/xterm.css" />
 <style>
@@ -100,11 +102,25 @@
   }
   #sendBtn:active { opacity: 0.8; }
 
-  #authErr { display: none; padding: 60px 20px; text-align: center; color: #ffa198; font-size: 14px; }
+  #authErr { display: none; padding: 60px 24px; text-align: center; color: #ffa198; font-size: 14px; }
+  #authErr input {
+    display: block; width: 100%; margin: 16px 0 8px; background: #0d1117;
+    border: 1px solid #30363d; border-radius: 8px; color: #e6edf3;
+    padding: 10px 12px; font-size: 16px; outline: none;
+  }
+  #authErr button {
+    background: #1f6feb; border: none; color: #fff; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
-  <div id="authErr">Unauthorized — rescan the QR code from Settings → Remote on your PC.</div>
+  <div id="authErr">
+    Unauthorized — rescan the QR code from Settings → Remote on your PC,
+    or paste the pairing link below.
+    <input id="tokenIn" type="text" autocomplete="off" autocapitalize="off" placeholder="Paste pairing link or token" />
+    <button id="tokenGo">Connect</button>
+  </div>
 
   <div id="board">
     <div class="topbar">
@@ -150,13 +166,26 @@
 <script src="/assets/xterm.js"></script>
 <script>
 (function () {
-  // Token arrives in the URL fragment from the pairing QR. Persist it so
-  // home-screen launches (which may drop the fragment) still authenticate.
+  // Token arrives in the URL fragment from the pairing QR, or in ?t= when an
+  // installed home-screen app launches via the tokenised manifest start_url.
+  // Persisted as a fallback for launches that carry neither.
   var token = location.hash.slice(1)
+  if (!token) {
+    try { token = new URLSearchParams(location.search).get('t') || '' } catch (e) {}
+  }
   if (token) {
     try { localStorage.setItem('claudinator-token', token) } catch (e) {}
   } else {
     try { token = localStorage.getItem('claudinator-token') || '' } catch (e) {}
+  }
+
+  // Inject the manifest with the token so "Add to Home Screen" installs a
+  // start URL that can authenticate.
+  if (token) {
+    var mlink = document.createElement('link')
+    mlink.rel = 'manifest'
+    mlink.href = '/manifest.webmanifest?t=' + encodeURIComponent(token)
+    document.head.appendChild(mlink)
   }
   var ws = null
   var state = null
@@ -178,6 +207,22 @@
     $('board').style.display = 'none'
     $('session').classList.remove('open')
   }
+
+  // Rescue path: paste the pairing link (or bare token) to re-authenticate —
+  // needed when an installed app launches with no token and empty storage.
+  $('tokenGo').addEventListener('click', function () {
+    var v = ($('tokenIn').value || '').trim()
+    if (!v) return
+    var t = v
+    if (v.indexOf('#') !== -1) {
+      t = v.slice(v.indexOf('#') + 1)
+    } else if (v.indexOf('t=') !== -1) {
+      try { t = new URLSearchParams(v.slice(v.indexOf('?'))).get('t') || v } catch (e) {}
+    }
+    try { localStorage.setItem('claudinator-token', t) } catch (e) {}
+    location.href = '/#' + t
+    location.reload()
+  })
 
   // ---- Board rendering ----
   function statusLabel(s) {
@@ -300,23 +345,33 @@
     })
     term.open($('term'))
     applyFit()
+    // Second pass after layout settles — metrics aren't perfectly linear
+    // across font sizes, so refine once against the re-measured width.
+    requestAnimationFrame(function () { applyFit() })
   }
 
-  // Fit-to-width: zoom the terminal so the desktop's full column grid fits the
-  // phone screen (CSS zoom scales layout + hit-testing consistently in WebKit).
-  // Toggling 1:1 restores actual size with horizontal panning.
+  // Fit-to-width: shrink the terminal's actual font size until the desktop's
+  // full column grid fits the phone screen. Scaling the real font (instead of
+  // CSS zoom/transform) keeps glyphs proportional — iOS WebKit renders zoomed
+  // text squashed. Floored at 5px: a very wide desktop terminal pans slightly
+  // rather than becoming unreadable. Toggling 1:1 restores full size.
+  var FULL_FONT = 11
+  var MIN_FONT = 5
   var fitMode = true
   function applyFit() {
-    var el = $('term')
     if (!term || !term.element) return
-    el.style.zoom = 1
-    var screen = term.element.querySelector('.xterm-screen')
-    var w = screen ? screen.offsetWidth : el.offsetWidth
-    if (fitMode && w > 0) {
+    var target = FULL_FONT
+    if (fitMode) {
+      var screen = term.element.querySelector('.xterm-screen')
+      var w = screen ? screen.offsetWidth : 0
       var avail = $('termWrap').clientWidth - 8
-      // Floor the zoom — a very wide desktop terminal would otherwise shrink
-      // below legibility. Slight horizontal panning beats unreadable text.
-      if (avail < w) el.style.zoom = Math.max(avail / w, 0.5)
+      if (w > 0 && avail < w) {
+        var current = term.options.fontSize || FULL_FONT
+        target = Math.max(MIN_FONT, Math.min(FULL_FONT, (current * avail) / w))
+      }
+    }
+    if (Math.abs((term.options.fontSize || FULL_FONT) - target) > 0.05) {
+      term.options.fontSize = target
     }
     $('fitBtn').textContent = fitMode ? '1:1' : 'Fit'
     term.scrollToBottom()
