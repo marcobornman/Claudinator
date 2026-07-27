@@ -10,6 +10,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.20',
+    date: '2026-07-27',
+    summary: 'Phone pairing works even with Hyper-V/WSL installed.',
+    highlights: [
+      'The pairing QR could point at a virtual network adapter (Hyper-V/WSL) that phones can never reach, showing "unavailable" no matter what. The pairing link now picks your real Wi-Fi/LAN address — virtual switches are sorted last and link-local addresses are skipped.'
+    ]
+  },
+  {
     version: '0.1.19',
     date: '2026-07-27',
     summary: 'Phone remote polish and a more resilient CLI updater.',
