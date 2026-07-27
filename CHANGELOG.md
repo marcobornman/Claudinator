@@ -4,6 +4,14 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.19] - 2026-07-27
+
+### Fixed
+- Phone remote: the terminal no longer yanks you back to the bottom while a session is working. Streaming output only re-pins to the bottom if you're already there, so you can scroll up and read the scrollback without being dragged down by every new chunk.
+- Phone remote: content no longer renders underneath the iOS status bar when launched as a "Add to Home Screen" app — the board, session header, and Unauthorized screen now reserve the top safe-area inset. No change in a normal browser tab.
+- Phone remote: the mobile page is served with `Cache-Control: no-store`, so after the desktop app updates the phone always loads the current page instead of a stale cached copy.
+- "Check for CLI Updates" is resilient to a stale proxy in the app's environment. A GUI app snapshots its environment at launch, so a dead proxy variable captured from the launching shell could make `claude update` report the npm registry as unreachable even when the network is fine. On a registry/network failure the update now retries once with proxy variables stripped; genuinely-proxied setups are unaffected because the strip only happens on the fallback.
+
 ## [0.1.18] - 2026-07-20
 
 ### Fixed

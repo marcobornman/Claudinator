@@ -26,7 +26,10 @@
   }
 
   /* ---- Board view ---- */
-  #board { padding: 14px 14px 40px; max-width: 560px; margin: 0 auto; }
+  /* Top safe-area padding keeps content clear of the iOS status bar when the
+     page is installed as a home-screen app (black-translucent + viewport-fit=cover
+     make it render underneath the clock/battery). Zero in a normal browser tab. */
+  #board { padding: calc(14px + env(safe-area-inset-top)) 14px 40px; max-width: 560px; margin: 0 auto; }
   .topbar { display: flex; align-items: center; gap: 10px; padding: 4px 2px 14px; }
   .topbar h1 { font-size: 16px; font-weight: 600; flex: 1; }
   .conn { width: 8px; height: 8px; border-radius: 50%; background: #f85149; }
@@ -64,7 +67,8 @@
   #session { position: fixed; inset: 0; background: #0d1117; display: none; flex-direction: column; }
   #session.open { display: flex; }
   .sessHead {
-    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
     border-bottom: 1px solid #21262d; flex-shrink: 0;
   }
   .back {
@@ -102,7 +106,7 @@
   }
   #sendBtn:active { opacity: 0.8; }
 
-  #authErr { display: none; padding: 60px 24px; text-align: center; color: #ffa198; font-size: 14px; }
+  #authErr { display: none; padding: calc(60px + env(safe-area-inset-top)) 24px 60px; text-align: center; color: #ffa198; font-size: 14px; }
   #authErr input {
     display: block; width: 100%; margin: 16px 0 8px; background: #0d1117;
     border: 1px solid #30363d; border-radius: 8px; color: #e6edf3;
@@ -379,6 +383,14 @@
   $('fitBtn').addEventListener('click', function () { fitMode = !fitMode; applyFit() })
   window.addEventListener('resize', function () { if (term) applyFit() })
 
+  // True when the terminal viewport is at (or within a row of) the bottom, i.e.
+  // the user hasn't scrolled up into the scrollback.
+  function atBottom() {
+    if (!term) return true
+    var b = term.buffer.active
+    return b.viewportY >= b.baseY - 1
+  }
+
   // ---- WebSocket ----
   function sendWs(obj) {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj))
@@ -429,8 +441,11 @@
       }
 
       if (msg.type === 'data' && term && curSession && msg.sessionId === curSession.sessionId) {
-        term.write(msg.data)
-        term.scrollToBottom()
+        // Only stay pinned to the bottom if you're already there — otherwise
+        // streaming output would yank you back down every time you scroll up
+        // to read the scrollback while a session is working.
+        var stick = atBottom()
+        term.write(msg.data, function () { if (stick) term.scrollToBottom() })
         return
       }
     }
