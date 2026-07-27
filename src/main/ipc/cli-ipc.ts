@@ -24,12 +24,28 @@ export interface CliUpdateResult {
 // inherited by the `claude update` child and make its internal `npm` call use
 // dev config — e.g. "registry unreachable". Strip them (plus NODE_OPTIONS) so
 // the child reads the user's real npm setup. No-op in the installed app.
-function cleanEnv(): NodeJS.ProcessEnv {
+//
+// When `stripProxy` is set we also drop the proxy vars. A GUI app snapshots its
+// environment at launch, so a stale/dead proxy captured from the shell it was
+// started from can poison the child's registry request even though the CLI and
+// network are fine from a fresh terminal. We only strip these on a fallback
+// retry (see runClaudeUpdate) so genuinely-proxied users are unaffected.
+const PROXY_VARS = new Set([
+  'http_proxy',
+  'https_proxy',
+  'all_proxy',
+  'no_proxy',
+  'ftp_proxy'
+])
+
+function cleanEnv(stripProxy = false): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {}
   for (const [key, value] of Object.entries(process.env)) {
-    if (key.toLowerCase().startsWith('npm_config_')) continue
-    if (key.toLowerCase().startsWith('npm_package_')) continue
+    const lower = key.toLowerCase()
+    if (lower.startsWith('npm_config_')) continue
+    if (lower.startsWith('npm_package_')) continue
     if (key === 'NODE_OPTIONS' || key === 'NODE_ENV') continue
+    if (stripProxy && PROXY_VARS.has(lower)) continue
     env[key] = value
   }
   return env
@@ -37,8 +53,40 @@ function cleanEnv(): NodeJS.ProcessEnv {
 
 // Run the `claude` binary through a shell so PATH resolution finds the
 // platform shim (e.g. claude.cmd on Windows). exec() uses a shell by default.
-async function runClaude(argsLine: string, timeout: number): Promise<{ stdout: string; stderr: string }> {
-  return await execAsync(`claude ${argsLine}`, { timeout, windowsHide: true, env: cleanEnv() })
+async function runClaude(
+  argsLine: string,
+  timeout: number,
+  stripProxy = false
+): Promise<{ stdout: string; stderr: string }> {
+  return await execAsync(`claude ${argsLine}`, {
+    timeout,
+    windowsHide: true,
+    env: cleanEnv(stripProxy)
+  })
+}
+
+// True for the class of `claude update` failures caused by the child not
+// reaching the npm registry — the case a stale/bad proxy in the app's inherited
+// environment produces. Matches the CLI's own wording plus common network codes.
+function looksLikeRegistryUnreachable(text: string): boolean {
+  return /registry|proxy|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EAI_AGAIN|network|fetch/i.test(
+    text
+  )
+}
+
+// Run `claude update`, and if it fails in a way that looks like the registry
+// was unreachable, retry once with proxy vars stripped from the child env.
+async function runClaudeUpdate(timeout: number): Promise<{ stdout: string; stderr: string }> {
+  try {
+    return await runClaude('update', timeout)
+  } catch (err) {
+    const e = err as Error & { stdout?: string; stderr?: string }
+    const combined = `${e.message}\n${e.stdout ?? ''}\n${e.stderr ?? ''}`
+    if (!looksLikeRegistryUnreachable(combined)) throw err
+    // Fallback: a stale/dead proxy in the inherited env is the likely culprit —
+    // retry without proxy vars so the child talks to the registry directly.
+    return await runClaude('update', timeout, true)
+  }
 }
 
 export function registerCliIpc(): void {
@@ -55,7 +103,7 @@ export function registerCliIpc(): void {
   ipcMain.handle(IPC.CLI_UPDATE, async (): Promise<CliUpdateResult> => {
     try {
       // `claude update` can download + install, so allow a generous timeout.
-      const { stdout, stderr } = await runClaude('update', 180_000)
+      const { stdout, stderr } = await runClaudeUpdate(180_000)
       const output = `${stdout}\n${stderr}`.trim()
       const updated = output.match(/updated from (\d+\.\d+\.\d+) to (?:version )?(\d+\.\d+\.\d+)/i)
       const alreadyLatest = !updated && /already .*(latest|up[- ]?to[- ]?date)|no update|up[- ]?to[- ]?date/i.test(output)

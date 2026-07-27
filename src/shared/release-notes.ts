@@ -10,6 +10,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.19',
+    date: '2026-07-27',
+    summary: 'Phone remote polish and a more resilient CLI updater.',
+    highlights: [
+      'On your phone, you can now scroll up to read the scrollback while a session is working — streaming output no longer drags you back to the bottom unless you were already there.',
+      'Home-screen app: the header no longer hides under the iPhone status bar, and the page always loads fresh after an update instead of a stale cached copy.',
+      '"Check for CLI Updates" recovers from a stale proxy in the app\'s environment — if the registry looks unreachable it retries once with proxy settings stripped, so the button keeps working.'
+    ]
+  },
+  {
     version: '0.1.18',
     date: '2026-07-20',
     summary: 'Phone remote, properly polished.',
