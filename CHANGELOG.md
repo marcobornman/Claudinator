@@ -4,6 +4,11 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.20] - 2026-07-27
+
+### Fixed
+- Phone remote: the pairing link/QR could advertise an unreachable address. Network adapters were used in raw enumeration order, so a Hyper-V/WSL virtual switch (e.g. `vEthernet` on `172.18.32.1`) could win over the real Wi-Fi adapter — and phones can never reach those host-only networks. Candidates are now ranked: link-local `169.254.*` dropped, known-virtual adapters (vEthernet/WSL/VirtualBox/VMware/Docker/Bluetooth) last, home-LAN ranges (`192.168.*`, `10.*`) first, with Tailscale's `100.x` in between.
+
 ## [0.1.19] - 2026-07-27
 
 ### Fixed
