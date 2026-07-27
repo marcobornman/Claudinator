@@ -71,19 +71,32 @@ class RemoteServer {
     return randomBytes(16).toString('hex')
   }
 
-  /** LAN URLs a phone can reach us on (IPv4, non-internal). */
+  /**
+   * LAN URLs a phone can reach us on (IPv4, non-internal), best candidate
+   * first — the QR/pairing link uses the first entry. Raw enumeration order
+   * is not usable: Hyper-V/WSL virtual switches (e.g. vEthernet
+   * 172.18.32.1) can enumerate before the real Wi-Fi adapter, and a phone
+   * can never reach those host-only networks. Link-local 169.254.* is
+   * dropped outright; known-virtual adapters sort last; common home-LAN
+   * ranges sort first (Tailscale's 100.x stays ahead of virtual switches).
+   */
   getUrls(): string[] {
     if (!this.isRunning()) return []
-    const urls: string[] = []
+    const virtualName = /vethernet|wsl|hyper-v|virtualbox|vmware|docker|npcap|loopback|bluetooth/i
+    const candidates: { address: string; score: number }[] = []
     const nets = networkInterfaces()
     for (const name of Object.keys(nets)) {
       for (const net of nets[name] ?? []) {
-        if (net.family === 'IPv4' && !net.internal) {
-          urls.push(`http://${net.address}:${this.port}`)
-        }
+        if (net.family !== 'IPv4' || net.internal) continue
+        if (net.address.startsWith('169.254.')) continue
+        let score = 2
+        if (net.address.startsWith('192.168.') || net.address.startsWith('10.')) score = 0
+        if (virtualName.test(name)) score = 10
+        candidates.push({ address: net.address, score })
       }
     }
-    return urls
+    candidates.sort((a, b) => a.score - b.score)
+    return candidates.map((c) => `http://${c.address}:${this.port}`)
   }
 
   async start(port: number, token: string): Promise<void> {
