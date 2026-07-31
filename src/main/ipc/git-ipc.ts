@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { execFile, exec } from 'child_process'
 import { existsSync } from 'fs'
+import { readdir, rmdir } from 'fs/promises'
 import { join, dirname, basename, resolve, normalize } from 'path'
 import { IPC } from '@shared/ipc-channels'
 import type { GitBranchesResult, GitWorktreeInfo } from '@shared/models'
@@ -112,6 +113,21 @@ function installDependencies(dir: string): Promise<void> {
 }
 
 const delay = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms))
+
+/**
+ * After removing a worktree that lived at features/<feature>/<RepoName>, drop
+ * the <feature> folder if that left it empty. Folders still holding notes or
+ * another repo's worktree are kept (rmdir refuses non-empty dirs anyway).
+ */
+async function cleanupFeatureDir(worktreePath: string): Promise<void> {
+  const featureDir = dirname(worktreePath)
+  if (basename(dirname(featureDir)).toLowerCase() !== 'features') return
+  try {
+    if ((await readdir(featureDir)).length === 0) await rmdir(featureDir)
+  } catch {
+    // gone already, or not ours to clean
+  }
+}
 
 export function registerGitIpc(): void {
   // Cache resolved git root per projectDir+sessionId
@@ -246,10 +262,12 @@ export function registerGitIpc(): void {
     ): Promise<{ path: string; branch: string; installError?: string }> => {
       const root = await findMainRoot(projectDir)
 
-      // Sibling folder next to the repo, so the worktree never sits inside the
-      // main checkout: <parent>/<repo>-worktrees/<branch-slug>
-      const slug = branch.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'worktree'
-      const worktreePath = join(dirname(root), `${basename(root)}-worktrees`, slug)
+      // Standard layout (see WORKTREE-STRUCTURE.md): <parent>/features/<feature>/<RepoName>,
+      // where <feature> is the branch minus its user prefix (marcob/apps-123 → apps-123).
+      // Cross-repo features share one folder, each repo's worktree beside the others.
+      const feature = branch.includes('/') ? branch.slice(branch.indexOf('/') + 1) : branch
+      const slug = feature.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'worktree'
+      const worktreePath = join(dirname(root), 'features', slug, basename(root))
 
       const args = createBranch
         ? ['worktree', 'add', worktreePath, '-b', branch, baseRef]
@@ -280,6 +298,7 @@ export function registerGitIpc(): void {
       if (force) args.push('--force')
       args.push(worktreePath)
       await runGit(args, root)
+      await cleanupFeatureDir(worktreePath)
     }
   )
 
@@ -344,6 +363,7 @@ export function registerGitIpc(): void {
       }
 
       if (removed) {
+        await cleanupFeatureDir(worktreePath)
         try {
           await runGit(['branch', '-d', branch], root)
         } catch {
