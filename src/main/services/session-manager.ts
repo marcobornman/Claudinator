@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid'
 import { SessionInfo, SessionStatus } from '@shared/models'
 import { buildClaudeArgs } from './claude-cli'
 import { isDecisionPrompt } from './attention'
-import { readFile, writeFile, readdir, stat } from 'fs/promises'
+import { readFile, writeFile, readdir, stat, open } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
 import { PAT } from './settings-persistence'
@@ -46,6 +46,9 @@ interface ManagedSession {
   // the same grid so the screen replays correctly.
   cols: number
   rows: number
+  // When the user manually set the conversation id, auto-detection may only
+  // override it with files modified after this instant.
+  manualIdAt?: number
 }
 
 class SessionManager {
@@ -273,6 +276,21 @@ class SessionManager {
     return () => managed.claudeIdListeners.delete(listener)
   }
 
+  /** Manual override from the UI — used when auto-detection latched onto the
+   *  wrong conversation (e.g. an agent transcript). Detection only overrides
+   *  this again with files that show activity after the edit. */
+  setClaudeSessionId(sessionId: string, claudeId: string | null): void {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) return
+    managed.manualIdAt = Date.now()
+    managed.info.claudeSessionId = claudeId
+    if (claudeId) {
+      for (const listener of managed.claudeIdListeners) {
+        listener(claudeId)
+      }
+    }
+  }
+
   onStatus(sessionId: string, listener: (status: SessionStatus) => void): () => void {
     const managed = this.sessions.get(sessionId)
     if (!managed) return () => {}
@@ -356,13 +374,38 @@ class SessionManager {
     const claudeProjectDir = join(homedir(), '.claude', 'projects', projectKey)
     const pollIntervalMs = 5000
 
+    // Agent (sidechain) transcripts land in the same folder as the main
+    // conversation and can be the newest file — adopting one links the card
+    // to an agent's conversation. Classify each file once by its first line.
+    const sidechainCache = new Map<string, boolean>()
+    const isSidechainFile = async (filePath: string, id: string): Promise<boolean> => {
+      const cached = sidechainCache.get(id)
+      if (cached !== undefined) return cached
+      try {
+        const fh = await open(filePath, 'r')
+        try {
+          const buf = Buffer.alloc(4096)
+          const { bytesRead } = await fh.read(buf, 0, buf.length, 0)
+          if (bytesRead === 0) return false // nothing written yet — retry next poll
+          const firstLine = buf.toString('utf-8', 0, bytesRead).split('\n', 1)[0]
+          const sidechain = /"isSidechain"\s*:\s*true/.test(firstLine)
+          sidechainCache.set(id, sidechain)
+          return sidechain
+        } finally {
+          await fh.close()
+        }
+      } catch {
+        return false // unreadable — assume main conversation
+      }
+    }
+
     const poll = async (): Promise<void> => {
       const managed = this.sessions.get(sessionId)
       if (!managed || managed.info.status === 'stopped') return
 
       try {
         const files = await readdir(claudeProjectDir)
-        let newest: { id: string; mtime: number } | null = null
+        const candidates: { id: string; path: string; mtime: number }[] = []
 
         for (const file of files) {
           if (!file.endsWith('.jsonl')) continue
@@ -372,22 +415,28 @@ class SessionManager {
           const filePath = join(claudeProjectDir, file)
           try {
             const fileStat = await stat(filePath)
-            if (fileStat.mtimeMs >= startedAfter && (!newest || fileStat.mtimeMs > newest.mtime)) {
-              newest = { id, mtime: fileStat.mtimeMs }
+            // Respect a manual edit: only files active after it may take over.
+            if (fileStat.mtimeMs >= startedAfter && fileStat.mtimeMs > (managed.manualIdAt ?? 0)) {
+              candidates.push({ id, path: filePath, mtime: fileStat.mtimeMs })
             }
           } catch {
             continue
           }
         }
 
-        // Adopt the newest conversation file whenever it changes — resumes,
-        // /clear and /new all fork to a new id mid-session, so detection never
-        // stops while the session is alive.
-        if (newest && newest.id !== managed.info.claudeSessionId) {
-          managed.info.claudeSessionId = newest.id
-          for (const listener of managed.claudeIdListeners) {
-            listener(newest.id)
+        // Adopt the newest main-conversation file whenever it changes —
+        // resumes, /clear and /new all fork to a new id mid-session, so
+        // detection never stops while the session is alive.
+        candidates.sort((a, b) => b.mtime - a.mtime)
+        for (const candidate of candidates) {
+          if (await isSidechainFile(candidate.path, candidate.id)) continue
+          if (candidate.id !== managed.info.claudeSessionId) {
+            managed.info.claudeSessionId = candidate.id
+            for (const listener of managed.claudeIdListeners) {
+              listener(candidate.id)
+            }
           }
+          break
         }
       } catch {
         // directory may not exist yet
