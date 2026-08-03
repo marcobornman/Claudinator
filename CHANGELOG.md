@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - New worktrees are created at `<parent>\features\<feature>\<RepoName>` (feature = branch name minus its `user/` prefix) instead of `<RepoName>-worktrees\<slug>`, following the team worktree standard — a feature spanning several repos collects its worktrees in one folder. Removing or merging back a worktree also deletes the feature folder when that leaves it empty; existing worktrees in old locations keep working.
 
+### Removed
+- The terminal no longer fades to 55% opacity when it loses keyboard focus. The dimming existed so the CLI's drawn input box wouldn't read as focused while typing elsewhere — the CLI now renders a hollow outline cursor when unfocused, which makes the distinction on its own.
+
 ### Fixed
 - Cards no longer get linked to the wrong conversation. The id detector adopted the newest transcript in the project folder, so an agent (sidechain) transcript could steal a card's session id — agent transcripts are now recognized and skipped. Note: two cards running sessions in the same folder can still cross-link; use the new id editor to fix those, or give each card its own folder/worktree.
 
