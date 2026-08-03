@@ -47,6 +47,9 @@ const api = {
   getContextInfo: (sessionId: string): Promise<string | null> =>
     ipcRenderer.invoke(IPC.SESSION_CONTEXT, sessionId),
 
+  setClaudeSessionId: (sessionId: string, claudeSessionId: string | null): Promise<void> =>
+    ipcRenderer.invoke(IPC.SESSION_SET_CLAUDE_ID, sessionId, claudeSessionId),
+
   // Git
   getGitStatus: (
     projectDir: string,

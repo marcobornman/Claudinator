@@ -135,23 +135,6 @@ export default function TerminalView({ sessionId, isVisible }: TerminalViewProps
       fitAndResize(containerRef.current, terminal, fitAddon, sessionId)
     )
 
-    // Dim the terminal when it doesn't have keyboard focus (or the window is
-    // blurred), so it's clear which terminal is active and the CLI's drawn input
-    // block doesn't read as focused when you're typing elsewhere.
-    const applyFocusStyle = (): void => {
-      const el = containerRef.current
-      if (!el) return
-      const focused = document.hasFocus() && document.activeElement === terminal.textarea
-      el.style.transition = 'opacity 0.15s ease'
-      el.style.opacity = focused ? '1' : '0.55'
-    }
-    const textarea = terminal.textarea
-    textarea?.addEventListener('focus', applyFocusStyle)
-    textarea?.addEventListener('blur', applyFocusStyle)
-    window.addEventListener('focus', applyFocusStyle)
-    window.addEventListener('blur', applyFocusStyle)
-    applyFocusStyle()
-
     // Subscribe to theme and override changes for live switching
     let prevTheme = useSettingsStore.getState().theme
     let prevOverrides = useSettingsStore.getState().themeOverrides
@@ -279,10 +262,6 @@ export default function TerminalView({ sessionId, isVisible }: TerminalViewProps
       scrollDisp.dispose()
       writeDisp.dispose()
       resizeObserver.disconnect()
-      textarea?.removeEventListener('focus', applyFocusStyle)
-      textarea?.removeEventListener('blur', applyFocusStyle)
-      window.removeEventListener('focus', applyFocusStyle)
-      window.removeEventListener('blur', applyFocusStyle)
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null

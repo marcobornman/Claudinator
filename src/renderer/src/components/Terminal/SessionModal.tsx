@@ -8,6 +8,8 @@ import { getTagColor } from '@/utils/tag-colors'
 import { useSettingsStore } from '@/stores/settings-store'
 import { useTitleBarDim } from '@/hooks/useTitleBarDim'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 interface SessionModalProps {
   sessionId: string
   /** When false the modal stays mounted but hidden, so its terminals keep
@@ -32,6 +34,8 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
   const [branchName, setBranchName] = useState<string | null>(null)
   const [contextInfo, setContextInfo] = useState<string | null>(null)
   const [sessionCost, setSessionCost] = useState<number | null>(null)
+  const [editingClaudeId, setEditingClaudeId] = useState(false)
+  const [claudeIdDraft, setClaudeIdDraft] = useState('')
   const isResizing = useRef(false)
 
   const hasProjectDir = Boolean(card?.projectDir)
@@ -65,6 +69,24 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
   }, [gitPanelWidth])
+
+  const claudeIdDraftValid = claudeIdDraft.trim() === '' || UUID_RE.test(claudeIdDraft.trim())
+
+  const startEditClaudeId = useCallback(() => {
+    setClaudeIdDraft(card?.claudeSessionId ?? '')
+    setEditingClaudeId(true)
+  }, [card?.claudeSessionId])
+
+  const saveClaudeId = useCallback(() => {
+    if (!card) return
+    const value = claudeIdDraft.trim().toLowerCase()
+    if (value !== '' && !UUID_RE.test(value)) return
+    const next = value === '' ? null : value
+    updateCard(card.id, { claudeSessionId: next })
+    // Sync the running session too, so auto-detection doesn't undo the edit.
+    window.api.setClaudeSessionId(sessionId, next)
+    setEditingClaudeId(false)
+  }, [card, claudeIdDraft, sessionId, updateCard])
 
   const handleChangeProjectDir = useCallback(async () => {
     if (!card) return
@@ -176,14 +198,77 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
 
             <div className="flex-1" />
 
-            {/* Claude session ID */}
-            {card?.claudeSessionId && (
-              <span
-                style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', fontWeight: 'bold', fontStyle: 'italic' }}
-                title={card.claudeSessionId}
-              >
-                {card.claudeSessionId}
-              </span>
+            {/* Claude session ID — editable, for when detection linked the wrong conversation */}
+            {card && (
+              editingClaudeId ? (
+                <div className="flex items-center shrink-0" style={{ gap: '4px' }}>
+                  <input
+                    autoFocus
+                    value={claudeIdDraft}
+                    onChange={(e) => setClaudeIdDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation()
+                      if (e.key === 'Enter') saveClaudeId()
+                      if (e.key === 'Escape') setEditingClaudeId(false)
+                    }}
+                    placeholder="session id (empty = start fresh)"
+                    spellCheck={false}
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      width: 300,
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      outline: 'none',
+                      backgroundColor: 'var(--bg-primary)',
+                      border: `1px solid ${claudeIdDraftValid ? 'var(--border-primary)' : '#e5534b'}`,
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  <button
+                    onClick={saveClaudeId}
+                    disabled={!claudeIdDraftValid}
+                    className="flex items-center justify-center rounded transition-colors cursor-pointer shrink-0"
+                    style={{ width: '20px', height: '20px', color: claudeIdDraftValid ? 'var(--text-muted)' : 'var(--text-faint)' }}
+                    title={claudeIdDraftValid ? 'Save (Enter)' : 'Not a valid session id'}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2.5 8.5l3.5 3.5 7.5-8" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setEditingClaudeId(false)}
+                    className="flex items-center justify-center rounded transition-colors cursor-pointer shrink-0"
+                    style={{ width: '20px', height: '20px', color: 'var(--text-muted)' }}
+                    title="Cancel (Esc)"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M4 4l8 8M12 4l-8 8" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center shrink-0" style={{ gap: '4px' }}>
+                  {card.claudeSessionId && (
+                    <span
+                      style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', fontWeight: 'bold', fontStyle: 'italic' }}
+                      title={card.claudeSessionId}
+                    >
+                      {card.claudeSessionId}
+                    </span>
+                  )}
+                  <button
+                    onClick={startEditClaudeId}
+                    className="flex items-center justify-center rounded transition-colors cursor-pointer shrink-0"
+                    style={{ width: '20px', height: '20px', color: 'var(--text-faint)' }}
+                    title="Edit session id — fix it if the wrong conversation got linked to this card"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" />
+                    </svg>
+                  </button>
+                </div>
+              )
             )}
 
             {/* Close button */}

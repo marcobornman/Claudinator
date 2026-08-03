@@ -10,6 +10,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.21',
+    date: '2026-07-31',
+    summary: 'Cards keep their own conversation, and worktrees follow the team standard.',
+    highlights: [
+      'Cards no longer get linked to the wrong conversation: agent (sidechain) transcripts are recognized and skipped by the session-id detector, and the id in the card header is now editable (pencil icon) — paste the right UUID or clear it to start fresh.',
+      'New worktrees land in a shared features folder: <parent>\\features\\<feature>\\<RepoName>, so a feature spanning several repos keeps its worktrees together. Cleaning up a worktree removes the feature folder once it’s empty.',
+      'The terminal no longer dims when it loses focus — the CLI’s own hollow outline cursor now shows the focus state, so the full-terminal fade was just noise.'
+    ]
+  },
+  {
     version: '0.1.20',
     date: '2026-07-27',
     summary: 'Phone pairing works even with Hyper-V/WSL installed.',

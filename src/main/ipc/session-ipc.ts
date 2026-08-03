@@ -87,4 +87,11 @@ export function registerSessionIpc(): void {
   ipcMain.handle(IPC.SESSION_CONTEXT, async (_event, sessionId: string) => {
     return sessionManager.getContextInfo(sessionId)
   })
+
+  ipcMain.handle(
+    IPC.SESSION_SET_CLAUDE_ID,
+    async (_event, sessionId: string, claudeId: string | null) => {
+      sessionManager.setClaudeSessionId(sessionId, claudeId)
+    }
+  )
 }

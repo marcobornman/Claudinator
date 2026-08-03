@@ -17,6 +17,7 @@ export const IPC = {
   SESSION_LIST: 'session:list',
   SESSION_CWD: 'session:cwd',
   SESSION_CLAUDE_ID: 'session:claude-id',
+  SESSION_SET_CLAUDE_ID: 'session:set-claude-id',
   SESSION_CONTEXT: 'session:context',
   SESSION_STATUS: 'session:status',
 
