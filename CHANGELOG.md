@@ -4,6 +4,14 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.22] - 2026-08-04
+
+### Fixed
+- Cards sharing a folder can no longer adopt each other's conversations. New sessions now launch with an app-generated conversation id (`claude --session-id <uuid>`), so the binding is certain from the first message instead of guessed from the filesystem. The id detector is also stricter: it skips ids owned by other live cards, only accepts a different file when it's provably ours — a resume fork (proven by the new file containing the old id in its copied history), a fresh file right after `/clear` in that card's own terminal, or the old escape hatches (no id yet / stale resume id) — and the launch-generated id persists to the card immediately.
+
+### Changed
+- The terminal now uses the Windows Terminal "Campbell" palette (the classic command-prompt colors) instead of Tokyo Night, and the app's dark theme was restyled to match: neutral cmd-style blacks and grays (`#0c0c0c` background), Campbell's cyan-blue accent, and Campbell green/red in the git diff panel. The title bar, detached markdown preview, and Settings theme previews follow along; the Theme Editor's defaults reflect the new palette and custom overrides still apply on top. The light theme and the phone remote are unchanged.
+
 ## [0.1.21] - 2026-07-31
 
 ### Added

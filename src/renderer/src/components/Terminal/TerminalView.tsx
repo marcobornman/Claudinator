@@ -5,28 +5,28 @@ import { useSettingsStore } from '@/stores/settings-store'
 import { useSessionStore } from '@/stores/session-store'
 import type { ITheme } from '@xterm/xterm'
 
-// Tokyo Night palette (matches the Mux terminal emulator)
+// Campbell palette (Windows Terminal / command prompt default)
 export const XTERM_DARK: ITheme = {
-  background: '#1a1b26',
-  foreground: '#c0caf5',
-  cursor: '#c0caf5',
-  selectionBackground: '#33467c',
-  black: '#15161e',
-  red: '#f7768e',
-  green: '#9ece6a',
-  yellow: '#e0af68',
-  blue: '#7aa2f7',
-  magenta: '#bb9af7',
-  cyan: '#7dcfff',
-  white: '#a9b1d6',
-  brightBlack: '#414868',
-  brightRed: '#f7768e',
-  brightGreen: '#9ece6a',
-  brightYellow: '#e0af68',
-  brightBlue: '#7aa2f7',
-  brightMagenta: '#bb9af7',
-  brightCyan: '#7dcfff',
-  brightWhite: '#c0caf5'
+  background: '#0c0c0c',
+  foreground: '#cccccc',
+  cursor: '#ffffff',
+  selectionBackground: '#ffffff4d',
+  black: '#0c0c0c',
+  red: '#c50f1f',
+  green: '#13a10e',
+  yellow: '#c19c00',
+  blue: '#0037da',
+  magenta: '#881798',
+  cyan: '#3a96dd',
+  white: '#cccccc',
+  brightBlack: '#767676',
+  brightRed: '#e74856',
+  brightGreen: '#16c60c',
+  brightYellow: '#f9f125',
+  brightBlue: '#3b78ff',
+  brightMagenta: '#b4009e',
+  brightCyan: '#61d6d6',
+  brightWhite: '#f2f2f2'
 }
 
 export const XTERM_LIGHT: ITheme = {

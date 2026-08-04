@@ -10,6 +10,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.22',
+    date: '2026-08-04',
+    summary: 'Sessions that can’t get mixed up, in command-prompt colors.',
+    highlights: [
+      'Cards in the same folder can no longer swap conversations: new sessions launch with an app-generated session id, so the card is bound to its conversation with certainty — and the detector never adopts an id that belongs to another card. Resume forks and /clear are still tracked, now scoped to the right card.',
+      'New look: the terminal uses the classic command-prompt (Windows Terminal "Campbell") colors, and the whole dark theme was restyled to match — neutral blacks and grays instead of the blue-tinted dark. Your own color overrides in the Theme Editor still apply on top.'
+    ]
+  },
+  {
     version: '0.1.21',
     date: '2026-07-31',
     summary: 'Cards keep their own conversation, and worktrees follow the team standard.',

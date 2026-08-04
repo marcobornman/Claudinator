@@ -49,6 +49,10 @@ interface ManagedSession {
   // When the user manually set the conversation id, auto-detection may only
   // override it with files modified after this instant.
   manualIdAt?: number
+  // Last time "/clear" appeared in THIS pty's output — /clear starts a brand
+  // new conversation with no content link to the old one, so this is the only
+  // signal tying the new file to this session rather than a neighbouring card.
+  clearSeenAt?: number
 }
 
 class SessionManager {
@@ -74,12 +78,18 @@ class SessionManager {
     }
 
     const id = uuid()
+    // Fresh sessions get an app-generated conversation id passed to the CLI
+    // via --session-id, so the binding is certain from the first message —
+    // cards sharing a folder can no longer adopt each other's conversations.
+    // Resumes fork to a NEW id on the first message, so those still rely on
+    // detection (which can prove the fork by content, see below).
+    const launchId = claudeSessionId ? null : uuid()
     const info: SessionInfo = {
       id,
       cardId,
       projectDir,
       status: 'starting',
-      claudeSessionId: claudeSessionId ?? null,
+      claudeSessionId: claudeSessionId ?? launchId,
       pid: null
     }
 
@@ -173,6 +183,12 @@ class SessionManager {
       for (const listener of managed.dataListeners) {
         listener(data)
       }
+      // The CLI redraws its input box per keystroke, so a typed "/clear" shows
+      // up contiguously in the recent output. The ring buffer is append-only
+      // (screen clears don't erase it), so a short tail window is enough.
+      if (managed.buffer.slice(-300).includes('/clear')) {
+        managed.clearSeenAt = Date.now()
+      }
       this.detectAttention(managed)
     })
 
@@ -187,7 +203,7 @@ class SessionManager {
     this.sessions.set(id, managed)
 
     // Send the claude command into the shell
-    const claudeCmd = buildClaudeArgs(cardTitle, claudeSessionId, claudeModel)
+    const claudeCmd = buildClaudeArgs(cardTitle, claudeSessionId, claudeModel, launchId)
     const startedAt = Date.now()
     ptyProcess.write(claudeCmd + '\r')
 
@@ -198,7 +214,7 @@ class SessionManager {
     // so the id we were handed goes stale on the first message — tracking the
     // newest file keeps the context badge live and the card's resume id
     // pointing at the latest state (same applies to /clear or /new mid-session).
-    this.startClaudeIdDetection(id, projectDir, startedAt)
+    this.startClaudeIdDetection(id, projectDir, startedAt, launchId)
 
     return info
   }
@@ -367,7 +383,12 @@ class SessionManager {
     return null
   }
 
-  private startClaudeIdDetection(sessionId: string, projectDir: string, startedAfter: number): void {
+  private startClaudeIdDetection(
+    sessionId: string,
+    projectDir: string,
+    startedAfter: number,
+    launchId: string | null
+  ): void {
     // Claude Code stores conversations in ~/.claude/projects/<encoded-path>/
     // The path encoding replaces non-alphanumeric chars (except -) with -
     const projectKey = projectDir.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+$/, '')
@@ -399,6 +420,32 @@ class SessionManager {
       }
     }
 
+    // A resume forks the conversation: the new file starts with the copied
+    // history, whose entries still carry the ORIGINAL session id — so a fork
+    // of OUR conversation can be proven by content. Only positives are cached;
+    // a file caught mid-copy may not contain the id yet.
+    const forkLinkCache = new Set<string>()
+    const isForkOf = async (filePath: string, id: string, parentId: string): Promise<boolean> => {
+      const key = `${id}:${parentId}`
+      if (forkLinkCache.has(key)) return true
+      try {
+        const fh = await open(filePath, 'r')
+        try {
+          const buf = Buffer.alloc(256 * 1024)
+          const { bytesRead } = await fh.read(buf, 0, buf.length, 0)
+          if (bytesRead > 0 && buf.toString('utf-8', 0, bytesRead).includes(parentId)) {
+            forkLinkCache.add(key)
+            return true
+          }
+          return false
+        } finally {
+          await fh.close()
+        }
+      } catch {
+        return false
+      }
+    }
+
     const poll = async (): Promise<void> => {
       const managed = this.sessions.get(sessionId)
       if (!managed || managed.info.status === 'stopped') return
@@ -424,17 +471,44 @@ class SessionManager {
           }
         }
 
-        // Adopt the newest main-conversation file whenever it changes —
-        // resumes, /clear and /new all fork to a new id mid-session, so
-        // detection never stops while the session is alive.
+        // Ids owned by other live sessions: every card in this folder scans
+        // the same directory, so never adopt a neighbour's conversation.
+        const claimed = new Set<string>()
+        for (const [otherId, other] of this.sessions) {
+          if (otherId === sessionId || other.info.status === 'stopped') continue
+          if (other.info.claudeSessionId) claimed.add(other.info.claudeSessionId)
+        }
+
+        const currentId = managed.info.claudeSessionId
+        // A --session-id launch is bound before its file exists — a missing
+        // file there means "no message yet", not "conversation vanished".
+        const currentFileMissing =
+          currentId !== null &&
+          currentId !== launchId &&
+          !files.includes(currentId + '.jsonl')
+        const clearWindow =
+          managed.clearSeenAt !== undefined && Date.now() - managed.clearSeenAt < 3 * 60_000
+
+        // Adopt a different file only when it's provably (or plausibly) OURS:
+        // no binding yet / our file vanished (bad resume id → user picked from
+        // the CLI list), a content-proven fork of our conversation (resume),
+        // or a fresh file right after /clear in this pty.
         candidates.sort((a, b) => b.mtime - a.mtime)
         for (const candidate of candidates) {
+          if (candidate.id === currentId) break // newest activity is already ours
+          if (claimed.has(candidate.id)) continue
           if (await isSidechainFile(candidate.path, candidate.id)) continue
-          if (candidate.id !== managed.info.claudeSessionId) {
-            managed.info.claudeSessionId = candidate.id
-            for (const listener of managed.claudeIdListeners) {
-              listener(candidate.id)
-            }
+
+          const adoptable =
+            !currentId ||
+            currentFileMissing ||
+            (clearWindow && candidate.mtime >= (managed.clearSeenAt ?? 0) - 10_000) ||
+            (await isForkOf(candidate.path, candidate.id, currentId))
+          if (!adoptable) continue
+
+          managed.info.claudeSessionId = candidate.id
+          for (const listener of managed.claudeIdListeners) {
+            listener(candidate.id)
           }
           break
         }
