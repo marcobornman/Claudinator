@@ -9,16 +9,16 @@ import { loadSettings } from './services/settings-persistence'
 import { IPC } from '@shared/ipc-channels'
 
 const THEME_TITLEBAR = {
-  dark: { color: '#0d1117', symbolColor: '#9198a1' },
+  dark: { color: '#0c0c0c', symbolColor: '#9d9d9d' },
   light: { color: '#ffffff', symbolColor: '#59636e' }
 } as const
 
 // Dimmed caption-button colors used while a full-screen modal is open. The OS
 // draws the title-bar overlay on top of everything, so the React backdrop can't
 // cover it — instead we darken the overlay to match the dimmed window. Values are
-// --bg-overlay composited over --bg-primary (dark: 0.6 over #0d1117, light: 0.3 over #fff).
+// --bg-overlay composited over --bg-primary (dark: 0.6 over #0c0c0c, light: 0.3 over #fff).
 const THEME_TITLEBAR_DIM = {
-  dark: { color: '#050709', symbolColor: '#9198a1' },
+  dark: { color: '#050505', symbolColor: '#9d9d9d' },
   light: { color: '#b3b3b3', symbolColor: '#59636e' }
 } as const
 

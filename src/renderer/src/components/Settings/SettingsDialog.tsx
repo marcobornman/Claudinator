@@ -971,12 +971,12 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                     >
                       <div style={{
                         width: '100%', height: 36, borderRadius: 6,
-                        backgroundColor: '#0d1117', border: '1px solid #30363d', marginBottom: 8,
+                        backgroundColor: '#0c0c0c', border: '1px solid #313131', marginBottom: 8,
                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                       }}>
-                        <div style={{ width: 24, height: 4, borderRadius: 2, backgroundColor: '#e6edf3' }} />
-                        <div style={{ width: 16, height: 4, borderRadius: 2, backgroundColor: '#9198a1' }} />
-                        <div style={{ width: 20, height: 4, borderRadius: 2, backgroundColor: '#656d76' }} />
+                        <div style={{ width: 24, height: 4, borderRadius: 2, backgroundColor: '#cccccc' }} />
+                        <div style={{ width: 16, height: 4, borderRadius: 2, backgroundColor: '#9d9d9d' }} />
+                        <div style={{ width: 20, height: 4, borderRadius: 2, backgroundColor: '#767676' }} />
                       </div>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Dark</div>
                     </button>
@@ -1065,7 +1065,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                         <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
                           {['--bg-primary', '--text-primary', '--accent'].map((key) => {
                             const cssDefaults = ct.base === 'dark'
-                              ? { '--bg-primary': '#0d1117', '--text-primary': '#e6edf3', '--accent': '#2563eb' }
+                              ? { '--bg-primary': '#0c0c0c', '--text-primary': '#cccccc', '--accent': '#3a96dd' }
                               : { '--bg-primary': '#ffffff', '--text-primary': '#1f2328', '--accent': '#2563eb' }
                             const color = ct.overrides[key] || cssDefaults[key as keyof typeof cssDefaults] || '#888'
                             return <div key={key} style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: color, border: '1px solid var(--border-primary)' }} />

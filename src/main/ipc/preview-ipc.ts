@@ -27,7 +27,7 @@ export function registerPreviewIpc(): void {
       return
     }
 
-    const bg = lastData?.theme === 'light' ? '#ffffff' : '#0d1117'
+    const bg = lastData?.theme === 'light' ? '#ffffff' : '#0c0c0c'
     previewWindow = new BrowserWindow({
       width: 620,
       height: 820,
