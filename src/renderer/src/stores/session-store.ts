@@ -28,6 +28,19 @@ interface SessionActions {
 
 type SessionStore = SessionState & SessionActions
 
+// Fresh sessions launch with an app-generated conversation id (--session-id),
+// already present on the returned info. The onClaudeSessionId event that
+// normally persists ids fires before the session lands in this store (and is
+// dropped), so persist it here as part of starting.
+function persistClaudeId(cardId: string, info: SessionInfo): void {
+  if (!info.claudeSessionId) return
+  if (cardId.startsWith('notes:')) {
+    window.api.setNoteSession(cardId.slice('notes:'.length), info.claudeSessionId)
+  } else {
+    useBoardStore.getState().updateCard(cardId, { claudeSessionId: info.claudeSessionId })
+  }
+}
+
 export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: {},
   activeSessionId: null,
@@ -43,6 +56,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       activeSessionId: info.id,
       viewingSessionId: info.id
     }))
+    persistClaudeId(cardId, info)
     return info
   },
 
@@ -54,6 +68,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       sessions: { ...state.sessions, [info.id]: info },
       openTabs: state.openTabs.includes(info.id) ? state.openTabs : [...state.openTabs, info.id]
     }))
+    persistClaudeId(cardId, info)
     return info
   },
 
