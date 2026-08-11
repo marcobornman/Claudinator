@@ -84,10 +84,11 @@ function derivePATEnvName(name: string): string {
 }
 
 // Curated model choices for the picker, newest first. 'sonnet'/'haiku' are
-// aliases (latest in family); Fable 5 / Opus 4.8 pin a specific version.
+// aliases (latest in family); Fable 5 / Opus 5 / Opus 4.8 pin a specific version.
 // '' means no --model flag (Claude Code's own default).
 const MODEL_PRESETS: { value: string; label: string }[] = [
   { value: 'claude-fable-5', label: 'Fable 5' },
+  { value: 'claude-opus-5', label: 'Opus 5' },
   { value: 'claude-opus-4-8', label: 'Opus 4.8' },
   { value: 'sonnet', label: 'Sonnet' },
   { value: 'haiku', label: 'Haiku' },
