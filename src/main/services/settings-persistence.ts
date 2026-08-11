@@ -40,7 +40,7 @@ function getSettingsPath(): string {
 }
 
 function createDefaultSettings(): Settings {
-  return { defaultProjectDir: '', claudeModel: 'claude-opus-4-8', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
+  return { defaultProjectDir: '', claudeModel: 'claude-opus-5', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
 }
 
 export async function loadSettings(): Promise<Settings> {

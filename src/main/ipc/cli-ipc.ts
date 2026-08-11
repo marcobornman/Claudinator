@@ -106,6 +106,21 @@ export function registerCliIpc(): void {
       const { stdout, stderr } = await runClaudeUpdate(180_000)
       const output = `${stdout}\n${stderr}`.trim()
       const updated = output.match(/updated from (\d+\.\d+\.\d+) to (?:version )?(\d+\.\d+\.\d+)/i)
+      // `claude update` exits 0 even when the install step fails (e.g. the
+      // running claude.exe can't be replaced on Windows), so success has to be
+      // judged from the output, not the exit code.
+      if (!updated && /update failed|error:/i.test(output)) {
+        const available = output.match(/new version available: (\d+\.\d+\.\d+)/i)?.[1]
+        const inUse = /is in use/i.test(output)
+        return {
+          ok: false,
+          alreadyLatest: false,
+          output,
+          error: inUse
+            ? `claude.exe is locked by a running Claude session${available ? ` (v${available} is available)` : ''}. Stop every running session in this app — each running card holds a lock — close any terminals or VS Code windows running Claude, then try again.`
+            : output.match(/error:\s*(.+)/i)?.[1] ?? 'Update failed'
+        }
+      }
       const alreadyLatest = !updated && /already .*(latest|up[- ]?to[- ]?date)|no update|up[- ]?to[- ]?date/i.test(output)
       return {
         ok: true,

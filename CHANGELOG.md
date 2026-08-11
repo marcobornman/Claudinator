@@ -4,6 +4,14 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.23] - 2026-08-11
+
+### Added
+- Claude Opus 5 (`claude-opus-5`) in the model picker — and it's the default model for new installs.
+
+### Fixed
+- "Check for CLI Updates" no longer reports success (or a generic error) when the update actually failed. `claude update` exits 0 even when it can't replace a locked `claude.exe`, so the result is now judged from the CLI's output — and the locked-exe case gets a clear message: stop every running session (each running card holds a lock on `claude.exe`), close other Claude terminals/VS Code, then retry.
+
 ## [0.1.22] - 2026-08-04
 
 ### Fixed

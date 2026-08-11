@@ -10,6 +10,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.23',
+    date: '2026-08-11',
+    summary: 'Opus 5 arrives, and the CLI updater tells the truth.',
+    highlights: [
+      'Claude Opus 5 is in the model picker (Settings → General) and is now the default model for new installs.',
+      'The CLI updater no longer pretends everything is fine when the update failed: if claude.exe is locked — every running session holds a lock, including your running cards — you now get told exactly that, instead of a bogus "you\'re on the latest version". Stop all sessions, then update.'
+    ]
+  },
+  {
     version: '0.1.22',
     date: '2026-08-04',
     summary: 'Sessions that can’t get mixed up, in command-prompt colors.',
