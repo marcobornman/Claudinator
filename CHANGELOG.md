@@ -4,6 +4,15 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.24] - 2026-08-14
+
+### Added
+- Time tracking tab (clock icon in the sidebar, under Notes & Docs). Work time is tracked automatically from terminal activity: any PTY traffic on a card opens a work interval that closes after 5 quiet minutes, persisted to `time-log.json`. The view is a Mon–Sun week table grouped by Jira item (loose card titles like "Apps 1906 …" normalize to `APPS-1906`), with per-day cells, a sticky day header, grid lines, and a totals bar pinned to the bottom of the view. CSV export produces timesheet-ready rows (`Jira Item, Card, Date, Hours, Estimated Hours`).
+- Estimates alongside tracked time: gaps under an hour between activity on the same card are bridged (shown as a muted `~h:mm` under each value) — covering the developing/reading time between terminal touches, without counting lunch/overnight gaps. All aggregation union-merges overlapping intervals, so parallel sessions and manual timers never double-count.
+- One-time backfill: on first open, each card bound to a conversation imports its transcript's message timestamps as historical work intervals — the tab isn't empty on day one.
+- Manual timers (start/stop per card from the bar in the Time tab) for work outside the terminal — meetings, testing, thinking. Entries are editable and deletable, and retro entries can be added per item.
+- The sidebar clock lights up in the accent color while time is recording (a running timer, or live activity in the last ~2 minutes) — themed for light/custom themes automatically.
+
 ## [0.1.23] - 2026-08-11
 
 ### Added

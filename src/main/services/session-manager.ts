@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid'
 import { SessionInfo, SessionStatus } from '@shared/models'
 import { buildClaudeArgs } from './claude-cli'
 import { isDecisionPrompt } from './attention'
+import { timeTracker } from './time-tracker'
 import { readFile, writeFile, readdir, stat, open } from 'fs/promises'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -189,6 +190,9 @@ class SessionManager {
       if (managed.buffer.slice(-300).includes('/clear')) {
         managed.clearSeenAt = Date.now()
       }
+      // Time tracking: any PTY traffic (Claude streaming, and keystroke echoes
+      // — the CLI redraws on input) counts as activity on this card.
+      timeTracker.ping(cardId, cardTitle)
       this.detectAttention(managed)
     })
 

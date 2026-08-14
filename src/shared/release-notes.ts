@@ -10,6 +10,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.24',
+    date: '2026-08-14',
+    summary: 'Time tracking that fills in your timesheet for you.',
+    highlights: [
+      'New Time tab (clock icon in the sidebar): your work time per card, tracked automatically from terminal activity — no timers to remember. A Mon–Sun week view grouped by Jira item, with history imported from your transcripts on first open, and CSV export ready for the business.',
+      'Estimates included: terminal time undercounts real work, so gaps under an hour between activity on a card are bridged into a ~ estimate — the develop-and-read time between terminal touches, without counting lunch or overnight.',
+      'Manual timers for the rest: meetings, testing, thinking. Start one from the Time tab; the sidebar clock glows in the accent color whenever time is recording.'
+    ]
+  },
+  {
     version: '0.1.23',
     date: '2026-08-11',
     summary: 'Opus 5 arrives, and the CLI updater tells the truth.',
