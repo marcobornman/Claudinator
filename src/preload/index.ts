@@ -10,6 +10,7 @@ import {
   GitBranchesResult
 } from '@shared/models'
 import type { StatsSummary } from '@shared/stats'
+import type { TimeEntry, TimeLogResult } from '@shared/time'
 
 const api = {
   // Board
@@ -200,6 +201,25 @@ const api = {
     output: string
     error?: string
   }> => ipcRenderer.invoke(IPC.CLI_UPDATE),
+
+  // Time tracking
+  getTimeLog: (fromMs: number, toMs: number): Promise<TimeLogResult> =>
+    ipcRenderer.invoke(IPC.TIME_LOG, fromMs, toMs),
+  startTimeTimer: (cardId: string, title: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.TIME_TIMER_START, cardId, title),
+  stopTimeTimer: (cardId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.TIME_TIMER_STOP, cardId),
+  addTimeEntry: (
+    cardId: string,
+    title: string,
+    start: number,
+    end: number
+  ): Promise<TimeEntry | null> => ipcRenderer.invoke(IPC.TIME_ENTRY_ADD, cardId, title, start, end),
+  updateTimeEntry: (id: string, start: number, end: number): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.TIME_ENTRY_UPDATE, id, start, end),
+  deleteTimeEntry: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC.TIME_ENTRY_DELETE, id),
+  backfillTimeLog: (): Promise<number> => ipcRenderer.invoke(IPC.TIME_BACKFILL),
 
   // Phone remote (embedded LAN server)
   getRemoteStatus: (): Promise<{

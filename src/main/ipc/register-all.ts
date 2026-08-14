@@ -10,6 +10,7 @@ import { registerNotesIpc } from './notes-ipc'
 import { registerPreviewIpc } from './preview-ipc'
 import { registerNotifyIpc } from './notify-ipc'
 import { registerRemoteIpc } from './remote-ipc'
+import { registerTimeIpc } from './time-ipc'
 
 export function registerAllIpc(): void {
   registerBoardIpc()
@@ -24,4 +25,5 @@ export function registerAllIpc(): void {
   registerPreviewIpc()
   registerNotifyIpc()
   registerRemoteIpc()
+  registerTimeIpc()
 }

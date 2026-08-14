@@ -81,6 +81,15 @@ export const IPC = {
   CLI_VERSION: 'cli:version',
   CLI_UPDATE: 'cli:update',
 
+  // Time tracking
+  TIME_LOG: 'time:log',
+  TIME_TIMER_START: 'time:timer-start',
+  TIME_TIMER_STOP: 'time:timer-stop',
+  TIME_ENTRY_ADD: 'time:entry-add',
+  TIME_ENTRY_UPDATE: 'time:entry-update',
+  TIME_ENTRY_DELETE: 'time:entry-delete',
+  TIME_BACKFILL: 'time:backfill',
+
   // Phone remote (embedded LAN server)
   REMOTE_STATUS: 'remote:status',
   REMOTE_SET: 'remote:set',

@@ -41,6 +41,28 @@ export default function Sidebar(): JSX.Element {
     return () => clearInterval(interval)
   }, [fetchStats])
 
+  // Clock icon lights up (accent) while time is being recorded — a manual
+  // timer, or live auto-tracked activity on a card.
+  const [tracking, setTracking] = useState(false)
+  useEffect(() => {
+    let alive = true
+    const check = async (): Promise<void> => {
+      try {
+        const now = Date.now()
+        const res = await window.api.getTimeLog(now - 60_000, now + 1)
+        if (alive) setTracking(res.timers.length > 0 || res.entries.some((e) => e.running))
+      } catch {
+        // ignore
+      }
+    }
+    check()
+    const iv = setInterval(check, 5000)
+    return () => {
+      alive = false
+      clearInterval(iv)
+    }
+  }, [])
+
   return (
     <div className="flex h-full w-14 shrink-0 flex-col items-center pb-4 gap-2.5" style={{ paddingTop: 12, borderRight: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)' }}>
       {/* Logo */}
@@ -114,6 +136,26 @@ export default function Sidebar(): JSX.Element {
         <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 1.5h5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1z" />
           <path d="M9 1.5V5h4M5.5 8.5h5M5.5 11h3.5" />
+        </svg>
+      </button>
+
+      {/* Time tracking */}
+      <button
+        onClick={() => setCurrentView('time')}
+        className="flex h-9 w-9 items-center justify-center rounded-lg cursor-pointer transition-colors"
+        style={{
+          backgroundColor: currentView === 'time' ? 'var(--bg-active)' : undefined,
+          color: tracking
+            ? 'var(--accent)'
+            : currentView === 'time'
+              ? 'var(--text-primary)'
+              : 'var(--text-muted)'
+        }}
+        title={tracking ? 'Time Tracking — recording' : 'Time Tracking'}
+      >
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="8" cy="8" r="6.5" />
+          <path d="M8 4.5V8l2.5 1.5" />
         </svg>
       </button>
 
