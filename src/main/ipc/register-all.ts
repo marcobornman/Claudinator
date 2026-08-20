@@ -11,6 +11,7 @@ import { registerPreviewIpc } from './preview-ipc'
 import { registerNotifyIpc } from './notify-ipc'
 import { registerRemoteIpc } from './remote-ipc'
 import { registerTimeIpc } from './time-ipc'
+import { registerUsageIpc } from './usage-ipc'
 
 export function registerAllIpc(): void {
   registerBoardIpc()
@@ -26,4 +27,5 @@ export function registerAllIpc(): void {
   registerNotifyIpc()
   registerRemoteIpc()
   registerTimeIpc()
+  registerUsageIpc()
 }
