@@ -4,6 +4,18 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.25] - 2026-08-20
+
+### Added
+- Model dropdown on cards (New Card and Edit Card): follow the Settings model (default), or pin the card to Fable 5 / Opus 5 / Opus 4.8 / Sonnet / Haiku. The override applies to every session started for that card — board, sessions panel, and worktree switches alike.
+- Claude plan usage in the sidebar: a ring above the token badge shows your 5-hour session window %, and clicking it opens a breakdown of every plan limit — Session, Weekly, and model-scoped weekly windows — with colored bars, reset countdowns, and a refresh button. Reads the same OAuth usage endpoint the CLI's `/usage` uses, via the Claude Code login already on the machine (read-only; the token is never modified).
+- Phone remote: a ⌫ backspace quick key (hold to rapid-delete) for clearing text stuck in the CLI's input box, and a ⧉ copy button that opens the terminal text as plain selectable text so iOS press-and-hold → Copy works.
+
+### Fixed
+- Board dots stuck on orange: idle sessions no longer get misclassified as "needs a decision". The CLI renders words with cursor moves (so ANSI-stripped output loses its spaces) and no longer prints the old "esc to interrupt" hint — both broke the detector's signals. Patterns are now space-tolerant, the working/finished signals match the current CLI (spinner timer, end-of-turn summary), and repaint fragments can no longer forge a fake numbered-option match.
+- Phone remote terminal scrolling, all of it: touch scrolling actually scrolls the terminal (an iOS quirk ignored xterm's programmatic scrolling on momentum layers), the board no longer scrolls underneath the open session, swipes below the rendered text scroll the terminal too, and the terminal now fills the screen down to the input bar instead of stopping halfway (extra display-only rows beyond the desktop grid).
+- Phone remote Send: the Enter now arrives as its own keystroke a beat after the text, so prompts stop being interpreted as pastes and left sitting in the CLI's input box unsubmitted. Touching the terminal no longer pops the iOS keyboard.
+
 ## [0.1.24] - 2026-08-14
 
 ### Added

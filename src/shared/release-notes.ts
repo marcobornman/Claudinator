@@ -10,6 +10,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.25',
+    date: '2026-08-20',
+    summary: 'Plan usage at a glance, models per card, and a phone remote that scrolls.',
+    highlights: [
+      'Claude plan usage in the sidebar: a ring shows your 5-hour session window %, and clicking it breaks down every limit — Session, Weekly, and per-model weekly — with reset countdowns. Same numbers as the CLI\'s /usage, without leaving the board.',
+      'Pick a model per card: New/Edit Card now has a Model dropdown — follow Settings (default) or pin this card to Fable 5, Opus 5, Opus 4.8, Sonnet, or Haiku for every session it starts.',
+      'The phone remote\'s terminal got a working thumb: touch scrolling actually scrolls (and fills the whole screen instead of half), the board stays put underneath, Send reliably submits, and new ⌫ / copy buttons handle stranded input text and getting text off the terminal.',
+      'Board dots tell the truth again: idle sessions no longer get stuck on the orange "needs a decision" pulse — the detector now understands the current CLI\'s rendering.'
+    ]
+  },
+  {
     version: '0.1.24',
     date: '2026-08-14',
     summary: 'Time tracking that fills in your timesheet for you.',
