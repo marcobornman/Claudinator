@@ -24,6 +24,12 @@
     font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
     overscroll-behavior: none;
   }
+  /* While the terminal overlay is open the board must not scroll underneath
+     it. iOS chains any touch scroll that the overlay doesn't consume (header,
+     input bar, terminal-at-bottom overscroll) into the page behind a fixed
+     overlay — overflow:hidden alone doesn't stop that, position:fixed does.
+     The board's scroll position is saved/restored around the lock in JS. */
+  body.sessOpen { position: fixed; inset: 0; width: 100%; overflow: hidden; }
 
   /* ---- Board view ---- */
   /* Top safe-area padding keeps content clear of the iOS status bar when the
@@ -76,15 +82,32 @@
     padding: 8px 14px; font-size: 13px;
   }
   .sessTitle { font-size: 14px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* Vertical scrolling belongs to xterm's own viewport (native momentum);
-     the wrap only pans horizontally when viewing at 1:1. */
-  #termWrap { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 6px 0 0 6px; }
+  /* Vertical scrolling is done by xterm itself: its touch handlers set the
+     viewport's scrollTop programmatically. -webkit-overflow-scrolling:touch
+     must NOT be set on the viewport — iOS ignores programmatic scrollTop on
+     momentum-scrolled layers while a finger is down, which made the terminal
+     unscrollable. The wrap only pans horizontally when viewing at 1:1. */
+  #termWrap { flex: 1; overflow-x: auto; overflow-y: hidden; padding: 6px 0 0 6px; overscroll-behavior: contain; }
   #term { width: max-content; }
-  .xterm .xterm-viewport { -webkit-overflow-scrolling: touch !important; overscroll-behavior: contain; }
+  .xterm .xterm-viewport { overscroll-behavior: contain; }
   .stoppedNote {
     display: none; padding: 8px 14px; background: #3d1d1f; color: #ffa198; font-size: 12px;
   }
   .stoppedNote.show { display: block; }
+
+  /* ---- Copy view: buffer text as plain selectable text ---- */
+  /* xterm's selection is mouse-driven and its rendered rows can't be
+     long-press selected on iOS, so copying goes through this overlay where
+     the native selection callout (with Copy) just works. */
+  #copyView { position: fixed; inset: 0; background: #0d1117; z-index: 10; display: none; flex-direction: column; }
+  #copyView.open { display: flex; }
+  .copyHint { font-size: 12px; color: #9198a1; flex: 1; }
+  #copyText {
+    flex: 1; overflow: auto; margin: 0; padding: 10px 14px calc(16px + env(safe-area-inset-bottom));
+    font: 11px/1.4 Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all;
+    color: #e6edf3; -webkit-user-select: text; user-select: text;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  }
 
   /* ---- Input bar ---- */
   .inputBar { flex-shrink: 0; border-top: 1px solid #21262d; background: #161b22; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
@@ -138,11 +161,19 @@
     <div class="sessHead">
       <button class="back" id="backBtn">‹ Board</button>
       <div class="sessTitle" id="sessTitle"></div>
+      <button class="back" id="copyBtn" title="Select and copy terminal text">⧉</button>
       <button class="back" id="fitBtn" title="Toggle fit-to-width / actual size">1:1</button>
       <div class="dot" id="sessDot"></div>
     </div>
     <div class="stoppedNote" id="stoppedNote">Session stopped.</div>
     <div id="termWrap"><div id="term"></div></div>
+    <div id="copyView">
+      <div class="sessHead">
+        <button class="back" id="copyDone">‹ Back</button>
+        <div class="copyHint">Press and hold to select, then Copy</div>
+      </div>
+      <pre id="copyText"></pre>
+    </div>
     <div class="inputBar">
       <div class="quickRow">
         <button class="qk" data-k="&#27;">Esc</button>
@@ -157,6 +188,7 @@
         <button class="qk" data-k="3">3</button>
         <button class="qk" data-k="y">y</button>
         <button class="qk" data-k="n">n</button>
+        <button class="qk" data-k="&#127;" id="bsBtn">⌫</button>
       </div>
       <div class="textRow">
         <button class="qk" id="imgBtn" style="flex: 0 0 46px;" title="Attach a photo">📷</button>
@@ -319,11 +351,17 @@
     if (card && card.status === null) $('stoppedNote').classList.add('show')
   }
 
+  // Board scroll offset, saved when the terminal overlay locks the body
+  // (body.sessOpen makes it position:fixed, which resets the page scroll).
+  var boardScrollY = 0
+
   function openSession(sessionId, title) {
     curSession = { sessionId: sessionId, cardTitle: title }
     $('sessTitle').textContent = title
     $('stoppedNote').classList.remove('show')
     $('session').classList.add('open')
+    boardScrollY = window.scrollY || 0
+    document.body.classList.add('sessOpen')
     updateSessionDot()
     if (term) { term.dispose(); term = null }
     sendWs({ type: 'sub', sessionId: sessionId })
@@ -333,12 +371,16 @@
     if (curSession) sendWs({ type: 'unsub', sessionId: curSession.sessionId })
     curSession = null
     $('session').classList.remove('open')
+    document.body.classList.remove('sessOpen')
+    window.scrollTo(0, boardScrollY)
     if (term) { term.dispose(); term = null }
     refreshState()
   }
 
+  var ptyRows = 30 // the desktop PTY's real grid height, from the buffer msg
   function initTerm(cols, rows) {
     if (term) term.dispose()
+    ptyRows = rows
     term = new Terminal({
       cols: cols, rows: rows,
       fontSize: 11,
@@ -348,6 +390,11 @@
       theme: { background: '#0d1117', foreground: '#e6edf3' }
     })
     term.open($('term'))
+    // Input is disabled, but xterm's hidden helper textarea still takes focus
+    // on touch — which pops the iOS keyboard for nothing. inputmode=none
+    // keeps focus behavior intact without summoning the keyboard.
+    var ta = term.element.querySelector('.xterm-helper-textarea')
+    if (ta) { ta.setAttribute('inputmode', 'none'); ta.setAttribute('readonly', 'readonly') }
     applyFit()
     // Second pass after layout settles — metrics aren't perfectly linear
     // across font sizes, so refine once against the re-measured width.
@@ -378,10 +425,86 @@
       term.options.fontSize = target
     }
     $('fitBtn').textContent = fitMode ? '1:1' : 'Fit'
+    fillRows()
     term.scrollToBottom()
+  }
+
+  // Fill the screen height: at fit-mode font sizes the desktop's grid is only
+  // a few hundred pixels tall, stranding scrolled text in the top half of the
+  // phone screen. This terminal is display-only (never resizes the PTY), so
+  // it can carry extra rows beyond the desktop grid — the viewport then shows
+  // that much more scrollback, all the way down to the input bar. Capped so
+  // the DOM renderer stays smooth on tall screens.
+  function fillRows() {
+    if (!term || !term.element) return
+    var screen = term.element.querySelector('.xterm-screen')
+    if (!screen || !term.rows) return
+    var cell = screen.offsetHeight / term.rows
+    if (!(cell > 0)) return
+    var want = Math.max(ptyRows, Math.min(150, Math.floor(($('termWrap').clientHeight - 8) / cell)))
+    if (want !== term.rows) {
+      term.resize(term.cols, want)
+      term.scrollToBottom()
+    }
   }
   $('fitBtn').addEventListener('click', function () { fitMode = !fitMode; applyFit() })
   window.addEventListener('resize', function () { if (term) applyFit() })
+
+  // In fit mode the rendered grid is only a few hundred pixels tall, so most
+  // of the screen below it is dead space xterm never sees — swipes there did
+  // nothing (or scrolled the board behind the overlay). Forward vertical
+  // drags on that dead space into terminal scrolling; touches on the
+  // terminal itself are left to xterm's own handlers. Mostly-horizontal
+  // gestures are released so 1:1 mode can still pan sideways natively.
+  ;(function () {
+    var startY = null
+    var startX = null
+    var wrap = $('termWrap')
+    wrap.addEventListener('touchstart', function (e) {
+      if (!term || !term.element || term.element.contains(e.target)) { startY = null; return }
+      startY = e.touches[0].pageY
+      startX = e.touches[0].pageX
+    }, { passive: true })
+    wrap.addEventListener('touchmove', function (e) {
+      if (startY == null || !term || !term.element) return
+      var y = e.touches[0].pageY
+      var x = e.touches[0].pageX
+      if (Math.abs(x - startX) > Math.abs(y - startY) + 8) { startY = null; return }
+      var screen = term.element.querySelector('.xterm-screen')
+      var cell = screen && term.rows ? screen.offsetHeight / term.rows : 10
+      var lines = Math.trunc((startY - y) / cell)
+      if (lines !== 0) {
+        term.scrollLines(lines)
+        startY = y
+      }
+      e.preventDefault()
+    }, { passive: false })
+    wrap.addEventListener('touchend', function () { startY = null }, { passive: true })
+  })()
+
+  // Copy view: snapshot the terminal buffer as plain text (soft-wrapped rows
+  // joined back into their logical lines) so iOS native selection can copy it.
+  $('copyBtn').addEventListener('click', function () {
+    if (!term) return
+    var b = term.buffer.active
+    var lines = []
+    var start = Math.max(0, b.length - 2000)
+    for (var i = start; i < b.length; i++) {
+      var line = b.getLine(i)
+      var s = line ? line.translateToString(true) : ''
+      if (line && line.isWrapped && lines.length) lines[lines.length - 1] += s
+      else lines.push(s)
+    }
+    while (lines.length && !lines[lines.length - 1]) lines.pop()
+    $('copyText').textContent = lines.join('\n')
+    $('copyView').classList.add('open')
+    var ct = $('copyText')
+    ct.scrollTop = ct.scrollHeight
+  })
+  $('copyDone').addEventListener('click', function () {
+    $('copyView').classList.remove('open')
+    $('copyText').textContent = ''
+  })
 
   // True when the terminal viewport is at (or within a row of) the bottom, i.e.
   // the user hasn't scrolled up into the scrollback.
@@ -469,10 +592,34 @@
     btn.addEventListener('click', function () { write(btn.dataset.k) })
   })
 
+  // Backspace repeats while held, so text sitting in the CLI's input box
+  // (typed but never submitted) can be wiped without fifty taps. touchstart
+  // preventDefault suppresses the synthetic click, so touch devices don't
+  // double-delete; desktop browsers still get the plain click above.
+  ;(function () {
+    var bs = $('bsBtn')
+    var timer = null
+    function stop() { if (timer) { clearTimeout(timer); timer = null } }
+    bs.addEventListener('touchstart', function (e) {
+      e.preventDefault()
+      write('\x7f')
+      timer = setTimeout(function tick() {
+        write('\x7f')
+        timer = setTimeout(tick, 60)
+      }, 400)
+    }, { passive: false })
+    bs.addEventListener('touchend', stop)
+    bs.addEventListener('touchcancel', stop)
+  })()
+
   function sendPrompt() {
     var input = $('msg')
     if (!input.value) return
-    write(input.value + '\r')
+    write(input.value)
+    // Enter goes as a separate keystroke a beat later: a text burst ending in
+    // \r reads as one paste to the CLI, which then leaves the whole prompt
+    // sitting in its input box instead of submitting it.
+    setTimeout(function () { write('\r') }, 150)
     input.value = ''
   }
   $('sendBtn').addEventListener('click', sendPrompt)
