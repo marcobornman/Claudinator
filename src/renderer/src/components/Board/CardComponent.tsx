@@ -348,7 +348,7 @@ export default function CardComponent({ card, onEdit }: CardComponentProps): JSX
     } else {
       try {
         const dir = card.worktreePath || card.projectDir
-        const info = await startSession(card.id, card.title, dir, card.claudeSessionId)
+        const info = await startSession(card.id, card.title, dir, card.claudeSessionId, card.model)
         updateCard(card.id, { sessionId: info.id })
       } catch (err) {
         useUIStore.getState().showToast(err instanceof Error ? err.message : 'Failed to start session')

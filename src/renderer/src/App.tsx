@@ -103,7 +103,7 @@ export default function App(): JSX.Element {
         <CardDialog
           onSave={(data) => {
             const card = addCard(data.title, data.description, data.projectDir)
-            updateCard(card.id, { tags: data.tags })
+            updateCard(card.id, { tags: data.tags, model: data.model })
             closeNewCardDialog()
           }}
           onClose={closeNewCardDialog}

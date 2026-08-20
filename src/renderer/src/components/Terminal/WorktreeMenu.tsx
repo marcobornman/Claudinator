@@ -117,7 +117,7 @@ export default function WorktreeMenu({ card, sessionId, branchName, onSwitched }
           claudeSessionId: null
         })
         const dir = worktreePath || card.projectDir
-        const info = await startSession(card.id, card.title, dir, null)
+        const info = await startSession(card.id, card.title, dir, null, card.model)
         updateCard(card.id, { sessionId: info.id })
         setOpen(false)
         onSwitched()
@@ -199,7 +199,7 @@ export default function WorktreeMenu({ card, sessionId, branchName, onSwitched }
         sessionId: null,
         claudeSessionId: null
       })
-      const info = await startSession(card.id, card.title, card.projectDir, null)
+      const info = await startSession(card.id, card.title, card.projectDir, null, card.model)
       updateCard(card.id, { sessionId: info.id })
 
       useUIStore
@@ -212,7 +212,7 @@ export default function WorktreeMenu({ card, sessionId, branchName, onSwitched }
       // The merge failed after the session was stopped — bring it back in the
       // worktree (resuming its conversation) so the card isn't left dead.
       try {
-        const info = await startSession(card.id, card.title, worktreePath, card.claudeSessionId)
+        const info = await startSession(card.id, card.title, worktreePath, card.claudeSessionId, card.model)
         updateCard(card.id, { sessionId: info.id })
       } catch {
         // starting failed too; clicking the card starts fresh

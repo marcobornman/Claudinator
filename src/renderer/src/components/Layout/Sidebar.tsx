@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSessionStore } from '@/stores/session-store'
 import { useBoardStore } from '@/stores/board-store'
 import SettingsDialog from '@/components/Settings/SettingsDialog'
+import ClaudeUsage from './ClaudeUsage'
 import logoUrl from '@/assets/icon.png'
 
 function formatTokens(n: number): string {
@@ -160,6 +161,9 @@ export default function Sidebar(): JSX.Element {
       </button>
 
       <div className="flex-1" />
+
+      {/* Claude plan usage (5-hour / weekly windows) */}
+      <ClaudeUsage />
 
       {/* Token usage → opens the stats dashboard */}
       {stats && (

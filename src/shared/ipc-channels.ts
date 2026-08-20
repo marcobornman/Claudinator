@@ -81,6 +81,9 @@ export const IPC = {
   CLI_VERSION: 'cli:version',
   CLI_UPDATE: 'cli:update',
 
+  // Claude plan usage limits (5-hour / weekly windows)
+  USAGE_LIMITS: 'usage:limits',
+
   // Time tracking
   TIME_LOG: 'time:log',
   TIME_TIMER_START: 'time:timer-start',

@@ -22,12 +22,19 @@ export function stripAnsi(s: string): string {
 
 // The most reliable, glyph-independent signal is the navigation footer every
 // arrow-select prompt prints, e.g. "Enter to select · ↑/↓ to navigate · Esc
-// to cancel". Match "Esc to cancel" (a prompt) but NOT "esc to interrupt"
-// (shown while Claude is actively generating).
-const DECISION_RE = /to navigate|Enter to select|Esc to cancel|[❯›▶]\s*\d+\.|Do you want to (?:proceed|continue)/gi
-// Signals that Claude is actively working: the interrupt hint, or the
-// spinner timer "(40s · thinking)" it redraws while generating.
-const RUNNING_RE = /esc to interrupt|\(\d+s\s*·/gi
+// to cancel". Ink positions words with cursor moves, so after stripping ANSI
+// the spaces between words are often simply gone ("Esctocancel") — every
+// phrase must match with the spaces optional. The numbered-option marker
+// requires a letter after "N." because interleaved repaint fragments can put
+// the idle input caret next to unrelated digits ("❯0.1." from a version
+// string) — real options start with words ("❯1.Yes").
+const DECISION_RE = /to\s*navigate|Enter\s*to\s*(?:select|confirm)|Esc\s*to\s*cancel|[❯›▶]\s*\d+\.\s*[A-Za-z]|Do\s*you\s*want\s*to\s*(?:proceed|continue)/gi
+// Signals that Claude is working or has just finished: the spinner timer
+// "(40s · ↓ 1 tokens)" redrawn while generating, the end-of-turn summary the
+// CLI leaves in the scrollback ("✻ Baked for 2s"), and the legacy interrupt
+// hint. The end-of-turn marker matters most: it lands after any prompt that
+// was answered during the turn, so a stale prompt can't stay "newest".
+const RUNNING_RE = /esc\s*to\s*interrupt|\(\d+s\s*·|[✻✶✽✢·*]\s*\w+\s*for\s*\d+s\b/gi
 
 function lastMatchIndex(t: string, re: RegExp): number {
   re.lastIndex = 0

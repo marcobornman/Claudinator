@@ -16,6 +16,8 @@ export interface Card {
   worktreePath?: string | null
   /** Branch checked out in the card's worktree (display only). */
   worktreeBranch?: string | null
+  /** Model override for this card's sessions; empty/unset follows Settings. */
+  model?: string | null
 }
 
 export interface GitBranchInfo {

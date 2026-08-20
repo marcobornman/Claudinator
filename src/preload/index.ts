@@ -11,6 +11,7 @@ import {
 } from '@shared/models'
 import type { StatsSummary } from '@shared/stats'
 import type { TimeEntry, TimeLogResult } from '@shared/time'
+import type { UsageLimitsResult } from '@shared/usage'
 
 const api = {
   // Board
@@ -26,6 +27,8 @@ const api = {
     cardTitle: string
     projectDir: string
     claudeSessionId?: string | null
+    /** Per-card model override; empty/unset falls back to the Settings model. */
+    model?: string | null
   }): Promise<SessionInfo> => ipcRenderer.invoke(IPC.SESSION_START, args),
 
   stopSession: (sessionId: string): Promise<boolean> =>
@@ -201,6 +204,10 @@ const api = {
     output: string
     error?: string
   }> => ipcRenderer.invoke(IPC.CLI_UPDATE),
+
+  // Claude plan usage limits
+  getUsageLimits: (force?: boolean): Promise<UsageLimitsResult> =>
+    ipcRenderer.invoke(IPC.USAGE_LIMITS, force),
 
   // Time tracking
   getTimeLog: (fromMs: number, toMs: number): Promise<TimeLogResult> =>
