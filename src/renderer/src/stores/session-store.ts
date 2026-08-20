@@ -13,8 +13,8 @@ interface SessionState {
 }
 
 interface SessionActions {
-  startSession: (cardId: string, cardTitle: string, projectDir: string, claudeSessionId?: string | null) => Promise<SessionInfo>
-  startSessionInline: (cardId: string, cardTitle: string, projectDir: string, claudeSessionId?: string | null) => Promise<SessionInfo>
+  startSession: (cardId: string, cardTitle: string, projectDir: string, claudeSessionId?: string | null, model?: string | null) => Promise<SessionInfo>
+  startSessionInline: (cardId: string, cardTitle: string, projectDir: string, claudeSessionId?: string | null, model?: string | null) => Promise<SessionInfo>
   stopSession: (sessionId: string) => Promise<void>
   setActiveSession: (sessionId: string | null) => void
   openTab: (sessionId: string) => void
@@ -48,8 +48,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   viewingSessionId: null,
   currentView: 'board',
 
-  startSession: async (cardId, cardTitle, projectDir, claudeSessionId) => {
-    const info = await window.api.startSession({ cardId, cardTitle, projectDir, claudeSessionId })
+  startSession: async (cardId, cardTitle, projectDir, claudeSessionId, model) => {
+    const info = await window.api.startSession({ cardId, cardTitle, projectDir, claudeSessionId, model })
     set((state) => ({
       sessions: { ...state.sessions, [info.id]: info },
       openTabs: state.openTabs.includes(info.id) ? state.openTabs : [...state.openTabs, info.id],
@@ -62,8 +62,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   // Like startSession but does not open the full-screen modal — used for the
   // inline CLI pane embedded in the Notes editor.
-  startSessionInline: async (cardId, cardTitle, projectDir, claudeSessionId) => {
-    const info = await window.api.startSession({ cardId, cardTitle, projectDir, claudeSessionId })
+  startSessionInline: async (cardId, cardTitle, projectDir, claudeSessionId, model) => {
+    const info = await window.api.startSession({ cardId, cardTitle, projectDir, claudeSessionId, model })
     set((state) => ({
       sessions: { ...state.sessions, [info.id]: info },
       openTabs: state.openTabs.includes(info.id) ? state.openTabs : [...state.openTabs, info.id]

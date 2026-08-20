@@ -13,6 +13,7 @@ export function registerSessionIpc(): void {
         cardTitle: string
         projectDir: string
         claudeSessionId?: string | null
+        model?: string | null
       }
     ) => {
       const settings = await loadSettings()
@@ -23,7 +24,7 @@ export function registerSessionIpc(): void {
         args.claudeSessionId,
         settings.rules,
         settings.pats,
-        settings.claudeModel
+        args.model?.trim() || settings.claudeModel
       )
 
       const win = BrowserWindow.fromWebContents(event.sender)

@@ -196,12 +196,12 @@ export default function Board(): JSX.Element {
     pendingOverColumnRef.current = null
   }
 
-  const handleSaveCard = (data: { title: string; description: string; projectDir: string; tags: string[] }): void => {
+  const handleSaveCard = (data: { title: string; description: string; projectDir: string; tags: string[]; model: string }): void => {
     if (dialogState.card) {
       updateCard(dialogState.card.id, data)
     } else {
       const card = addCard(data.title, data.description, data.projectDir, dialogState.columnId)
-      updateCard(card.id, { tags: data.tags })
+      updateCard(card.id, { tags: data.tags, model: data.model })
     }
     setDialogState({ open: false })
   }

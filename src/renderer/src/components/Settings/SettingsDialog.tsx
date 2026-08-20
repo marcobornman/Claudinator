@@ -3,6 +3,7 @@ import { useSettingsStore } from '@/stores/settings-store'
 import { useTitleBarDim } from '@/hooks/useTitleBarDim'
 import ThemeEditor from './ThemeEditor'
 import type { ThemeTemplate, ThemeOverrides, CustomTheme } from '@shared/models'
+import { MODEL_PRESETS, formatModelName } from '@shared/model-presets'
 
 interface SettingsDialogProps {
   onClose: () => void
@@ -83,31 +84,7 @@ function derivePATEnvName(name: string): string {
   return 'PAT_' + name.toUpperCase().replace(/[^A-Z0-9]/g, '_')
 }
 
-// Curated model choices for the picker, newest first. 'sonnet'/'haiku' are
-// aliases (latest in family); Fable 5 / Opus 5 / Opus 4.8 pin a specific version.
-// '' means no --model flag (Claude Code's own default).
-const MODEL_PRESETS: { value: string; label: string }[] = [
-  { value: 'claude-fable-5', label: 'Fable 5' },
-  { value: 'claude-opus-5', label: 'Opus 5' },
-  { value: 'claude-opus-4-8', label: 'Opus 4.8' },
-  { value: 'sonnet', label: 'Sonnet' },
-  { value: 'haiku', label: 'Haiku' },
-  { value: '', label: 'Default' }
-]
 const CUSTOM_MODEL = '__custom__'
-
-function formatModelName(model: string): string {
-  if (!model) return 'Latest (auto)'
-  // Strip trailing date snapshot like -20250428
-  const cleaned = model.replace(/-\d{8}$/, '')
-  const parts = cleaned.split('-')
-  if (parts[0] === 'claude' && parts.length >= 4) {
-    const family = parts[1].charAt(0).toUpperCase() + parts[1].slice(1)
-    const version = parts.slice(2).join('.')
-    return `Claude ${family} ${version}`
-  }
-  return model
-}
 
 export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.Element {
   const store = useSettingsStore()
