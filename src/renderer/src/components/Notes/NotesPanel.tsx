@@ -107,7 +107,9 @@ export default function NotesPanel(): JSX.Element {
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
-  const [cliVisible, setCliVisible] = useState(true)
+  // The inline CLI starts minimized (its session still runs) — the strip at
+  // the bottom expands it when wanted.
+  const [cliVisible, setCliVisible] = useState(false)
   const [cliHeight, setCliHeight] = useState(260)
   const [editorPct, setEditorPct] = useState(50)
   const [sessionByNote, setSessionByNote] = useState<Record<string, string>>({})

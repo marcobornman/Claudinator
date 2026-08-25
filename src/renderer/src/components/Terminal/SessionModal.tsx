@@ -29,7 +29,9 @@ export default function SessionModal({ sessionId, visible = true }: SessionModal
   const card = session ? cards[session.cardId] : null
   const title = card?.title ?? 'Session'
   const tags = card?.tags ?? []
-  const [gitPanelOpen, setGitPanelOpen] = useState(true)
+  // Files-changed panel starts closed — the terminal is what you came for;
+  // the header toggle brings it back.
+  const [gitPanelOpen, setGitPanelOpen] = useState(false)
   const [gitPanelWidth, setGitPanelWidth] = useState(340)
   const [branchName, setBranchName] = useState<string | null>(null)
   const [contextInfo, setContextInfo] = useState<string | null>(null)
