@@ -424,7 +424,7 @@
     if (Math.abs((term.options.fontSize || FULL_FONT) - target) > 0.05) {
       term.options.fontSize = target
     }
-    $('fitBtn').textContent = fitMode ? '1:1' : 'Fit'
+    $('fitBtn').textContent = fitMode ? 'Fit' : '1:1'
     fillRows()
     term.scrollToBottom()
   }
@@ -558,7 +558,12 @@
       if (msg.type === 'buffer' && curSession && msg.sessionId === curSession.sessionId) {
         initTerm(msg.cols, msg.rows)
         term.write(msg.data, function () {
-          term.scrollToBottom()
+          // Re-fit now that the buffer has actually rendered — the passes in
+          // initTerm can run against a zero-width screen and do nothing,
+          // which left fresh sessions at full size despite fit mode being on.
+          // Second pass refines: metrics aren't linear across font sizes.
+          applyFit()
+          requestAnimationFrame(function () { applyFit() })
         })
         return
       }
