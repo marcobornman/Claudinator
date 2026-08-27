@@ -10,6 +10,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.26',
+    date: '2026-08-27',
+    summary: 'Quieter openings: panes start collapsed, and the phone remote fits on arrival.',
+    highlights: [
+      'Opening a card gives the terminal the full width: the Files Changed panel starts collapsed (one click brings it back). Notes do the same — the CLI session still starts in the background, but its pane opens minimized.',
+      'The phone remote opens sessions properly fitted instead of zoomed in — the initial fit used to run before the terminal had rendered and silently did nothing. The Fit/1:1 button now shows the mode you\'re in, not the one it switches to.'
+    ]
+  },
+  {
     version: '0.1.25',
     date: '2026-08-20',
     summary: 'Plan usage at a glance, models per card, and a phone remote that scrolls.',
