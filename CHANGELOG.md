@@ -4,6 +4,15 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.26] - 2026-08-27
+
+### Changed
+- Opening a card no longer opens the Files Changed panel — it starts collapsed and expands on click, so the terminal gets the full width up front.
+- Opening a note no longer expands its CLI session — the session still starts (and keeps running) in the background, but the pane starts minimized with an expand strip at the bottom.
+
+### Fixed
+- Phone remote: opening a session no longer lands zoomed in. The initial fit ran before the terminal had rendered (measuring a zero-width screen and silently doing nothing), so sessions opened at 1:1 despite Fit being active — the fit now applies once the buffer renders. The Fit/1:1 button also shows the *current* mode instead of the mode it would switch to.
+
 ## [0.1.25] - 2026-08-20
 
 ### Added
