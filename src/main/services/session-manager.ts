@@ -360,27 +360,44 @@ class SessionManager {
       const content = await readFile(jsonlPath, 'utf-8')
       const lines = content.split('\n').filter((l) => l.trim())
 
-      // Scan backward for last assistant message with usage data
+      const format = (tokens: number, model: string): string => {
+        const pct = Math.round((tokens / contextLimitFor(model)) * 100)
+        if (tokens >= 1000) {
+          const k = (tokens / 1000).toFixed(1).replace(/\.0$/, '')
+          return `${pct}% (${k}k)`
+        }
+        return `${pct}% (${tokens})`
+      }
+
+      // Scan backward for the freshest context signal: an assistant reply's
+      // usage, or a compact boundary — /compact writes no assistant message,
+      // so its postTokens is the only record of the shrunken context until
+      // the next reply lands.
+      let pendingCompactTokens: number | null = null
       for (let i = lines.length - 1; i >= 0; i--) {
         try {
           const entry = JSON.parse(lines[i])
+          const postTokens = entry?.compactMetadata?.postTokens
+          if (entry?.subtype === 'compact_boundary' && typeof postTokens === 'number') {
+            // The context limit depends on the model, which only assistant
+            // messages carry — keep scanning back for one.
+            pendingCompactTokens = postTokens
+            continue
+          }
           const usage = entry?.message?.usage
           if (usage && entry?.message?.role === 'assistant') {
+            const model = entry?.message?.model ?? ''
+            if (pendingCompactTokens !== null) return format(pendingCompactTokens, model)
             const inputTokens = (usage.input_tokens ?? 0)
               + (usage.cache_creation_input_tokens ?? 0)
               + (usage.cache_read_input_tokens ?? 0)
-            const contextLimit = contextLimitFor(entry?.message?.model ?? '')
-            const pct = Math.round((inputTokens / contextLimit) * 100)
-            if (inputTokens >= 1000) {
-              const k = (inputTokens / 1000).toFixed(1).replace(/\.0$/, '')
-              return `${pct}% (${k}k)`
-            }
-            return `${pct}% (${inputTokens})`
+            return format(inputTokens, model)
           }
         } catch {
           continue
         }
       }
+      if (pendingCompactTokens !== null) return format(pendingCompactTokens, '')
     } catch {
       // file doesn't exist yet or can't be read
     }
