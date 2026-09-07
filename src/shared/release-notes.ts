@@ -10,6 +10,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.27',
+    date: '2026-09-07',
+    summary: 'Your markdown viewer now, and a context badge that believes in /compact.',
+    highlights: [
+      'Right-click any .md file in Windows → Open with → Claude Code Orchestrator: it opens straight into the preview popout — rendered markdown in your theme, no board. Already running? The file opens in the running app instantly. The refresh button re-reads from disk, so it doubles as a live view of a file Claude is editing.',
+      'The session header\'s context badge updates the moment you /compact, instead of showing the old near-full number until the next reply.'
+    ]
+  },
+  {
     version: '0.1.26',
     date: '2026-08-27',
     summary: 'Quieter openings: panes start collapsed, and the phone remote fits on arrival.',
