@@ -10,6 +10,14 @@ files:
   - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}"
 asarUnpack:
   - "node_modules/node-pty/**"
+# Lists the app in Windows' "Open with" menu for markdown files; opening one
+# launches straight into the preview window (viewer mode), no board.
+fileAssociations:
+  - ext:
+      - md
+      - markdown
+    name: Markdown Document
+    role: Viewer
 win:
   executableName: claude-orchestrator
   target:

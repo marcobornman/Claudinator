@@ -1,8 +1,10 @@
 import { app, BrowserWindow, Menu, shell, ipcMain } from 'electron'
-import { join } from 'path'
+import { join, isAbsolute, resolve } from 'path'
+import { existsSync } from 'fs'
 import { is } from '@electron-toolkit/utils'
 import { registerAllIpc } from './ipc/register-all'
 import { startRemoteIfEnabled } from './ipc/remote-ipc'
+import { showFileInPreview } from './ipc/preview-ipc'
 import { sessionManager } from './services/session-manager'
 import { remoteServer } from './services/remote-server'
 import { loadSettings } from './services/settings-persistence'
@@ -24,6 +26,8 @@ const THEME_TITLEBAR_DIM = {
 
 let currentTheme: 'dark' | 'light' = 'dark'
 let dimDepth = 0
+let mainWindow: BrowserWindow | null = null
+let remoteStarted = false
 
 function refreshTitleBar(win: BrowserWindow): void {
   const palette = dimDepth > 0 ? THEME_TITLEBAR_DIM : THEME_TITLEBAR
@@ -31,12 +35,50 @@ function refreshTitleBar(win: BrowserWindow): void {
   win.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor, height: 36 })
 }
 
+// The board's title-bar handlers live outside createWindow so re-creating the
+// board (second-instance while only the preview is open) can't double-register.
+function registerTitleBarIpc(): void {
+  ipcMain.handle(IPC.THEME_CHANGE, (_event, theme: 'dark' | 'light') => {
+    currentTheme = theme
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setBackgroundColor((THEME_TITLEBAR[theme] ?? THEME_TITLEBAR.dark).color)
+      refreshTitleBar(mainWindow)
+    }
+  })
+
+  // Dim/restore the caption-button overlay while modals are open (ref-counted so
+  // stacked modals don't restore early).
+  ipcMain.handle(IPC.TITLEBAR_DIM, (_event, dimmed: boolean) => {
+    dimDepth = Math.max(0, dimDepth + (dimmed ? 1 : -1))
+    if (mainWindow && !mainWindow.isDestroyed()) refreshTitleBar(mainWindow)
+  })
+}
+
+function ensureRemote(): void {
+  if (remoteStarted) return
+  remoteStarted = true
+  startRemoteIfEnabled()
+}
+
+// First .md/.markdown path in the launch args — how Windows hands us a file
+// opened via "Open with". Only consulted in packaged builds (dev argv carries
+// electron's own paths).
+function mdPathFromArgv(argv: string[], cwd: string): string | null {
+  for (const raw of argv.slice(1)) {
+    if (raw.startsWith('-')) continue
+    if (!/\.(md|markdown)$/i.test(raw)) continue
+    const path = isAbsolute(raw) ? raw : resolve(cwd, raw)
+    if (existsSync(path)) return path
+  }
+  return null
+}
+
 async function createWindow(): Promise<void> {
   const settings = await loadSettings()
   currentTheme = settings.theme === 'light' ? 'light' : 'dark'
   const tb = THEME_TITLEBAR[currentTheme] ?? THEME_TITLEBAR.dark
 
-  const mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 900,
@@ -62,38 +104,29 @@ async function createWindow(): Promise<void> {
     }
   })
 
-  // Update titlebar when theme changes at runtime
-  ipcMain.handle(IPC.THEME_CHANGE, (_event, theme: 'dark' | 'light') => {
-    currentTheme = theme
-    mainWindow.setBackgroundColor((THEME_TITLEBAR[theme] ?? THEME_TITLEBAR.dark).color)
-    refreshTitleBar(mainWindow)
+  mainWindow = win
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
   })
 
-  // Dim/restore the caption-button overlay while modals are open (ref-counted so
-  // stacked modals don't restore early).
-  ipcMain.handle(IPC.TITLEBAR_DIM, (_event, dimmed: boolean) => {
-    dimDepth = Math.max(0, dimDepth + (dimmed ? 1 : -1))
-    refreshTitleBar(mainWindow)
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  win.on('ready-to-show', () => {
+    win.show()
   })
 
   // Stop the taskbar-flash nudge as soon as the user comes back to the app.
-  mainWindow.on('focus', () => {
-    mainWindow.flashFrame(false)
+  win.on('focus', () => {
+    win.flashFrame(false)
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  win.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
@@ -102,11 +135,48 @@ async function createWindow(): Promise<void> {
 // match the electron-builder appId so packaged shortcuts resolve to it.
 app.setAppUserModelId('com.claude-orchestrator.app')
 
+// Launched with a markdown file (Windows "Open with")? Skip the board and open
+// just the preview window. Packaged builds only — and the single-instance lock
+// is packaged-only too, since dev and installed share a userData dir and the
+// lock would otherwise stop `npm run dev` while the installed app is running.
+const fileToPreview = app.isPackaged ? mdPathFromArgv(process.argv, process.cwd()) : null
+let quitting = false
+
+if (app.isPackaged) {
+  if (!app.requestSingleInstanceLock()) {
+    // Hand our argv to the running instance and bow out.
+    quitting = true
+    app.quit()
+  } else {
+    app.on('second-instance', (_event, argv, workingDirectory) => {
+      const md = mdPathFromArgv(argv, workingDirectory)
+      if (md) {
+        void showFileInPreview(md)
+        return
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.focus()
+      } else {
+        // Only the preview is open (viewer-mode launch) and the user started
+        // the app proper — bring up the board.
+        void createWindow().then(ensureRemote)
+      }
+    })
+  }
+}
+
 app.whenReady().then(async () => {
+  if (quitting) return
   Menu.setApplicationMenu(null)
   registerAllIpc()
+  registerTitleBarIpc()
+  if (fileToPreview) {
+    await showFileInPreview(fileToPreview)
+    return
+  }
   await createWindow()
-  startRemoteIfEnabled()
+  ensureRemote()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
