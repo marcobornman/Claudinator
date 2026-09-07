@@ -4,6 +4,14 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.27] - 2026-09-07
+
+### Added
+- Open markdown files from anywhere in Windows: the app registers as an "Open with" candidate for `.md`/`.markdown` files. Opening one launches straight into the preview popout — rendered markdown in your theme, no board — and if the orchestrator is already running, the file opens in it instantly instead of booting a second copy. The popout's refresh button re-reads the file from disk, so it doubles as a live view of a file Claude is editing.
+
+### Fixed
+- The context badge in the session header now drops immediately after `/compact` instead of showing the stale pre-compact figure until the next reply — the compact boundary's recorded post-compact size is used as soon as it appears in the transcript.
+
 ## [0.1.26] - 2026-08-27
 
 ### Changed
