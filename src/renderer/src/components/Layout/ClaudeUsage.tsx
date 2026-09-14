@@ -33,8 +33,8 @@ function updatedAgo(updatedAt: number, now: number): string {
 }
 
 export default function ClaudeUsage(): JSX.Element | null {
-  // The ring reads the Claude plan's OAuth usage endpoint — meaningless (and
-  // noisy: token errors) when sessions run on Codex, so hide it there.
+  // Main serves the active engine's numbers under the same shape: Claude
+  // plan usage via OAuth, or Codex rate limits read from local rollouts.
   const engine = useSettingsStore((s) => s.engine)
   const [usage, setUsage] = useState<UsageLimitsResult | null>(null)
   const [open, setOpen] = useState(false)
@@ -50,7 +50,6 @@ export default function ClaudeUsage(): JSX.Element | null {
   }, [])
 
   useEffect(() => {
-    if (engine !== 'claude') return // don't poll the Claude OAuth endpoint in codex mode
     refresh()
     const iv = setInterval(() => refresh(), 5 * 60_000)
     return () => clearInterval(iv)
@@ -64,7 +63,6 @@ export default function ClaudeUsage(): JSX.Element | null {
     return () => clearInterval(iv)
   }, [open, refresh])
 
-  if (engine !== 'claude') return null
   if (!usage || (usage.limits.length === 0 && !usage.error)) return null
 
   const session = usage.limits.find((l) => l.kind === 'session')
@@ -79,7 +77,7 @@ export default function ClaudeUsage(): JSX.Element | null {
         onClick={() => setOpen((o) => !o)}
         className="relative flex h-9 w-9 items-center justify-center rounded-lg transition-colors cursor-pointer"
         style={{ color: 'var(--text-muted)', backgroundColor: open ? 'var(--bg-active)' : undefined }}
-        title="Claude plan usage"
+        title={engine === 'codex' ? 'Codex plan usage' : 'Claude plan usage'}
       >
         <svg width="30" height="30" viewBox="0 0 30 30">
           <circle cx="15" cy="15" r={R} fill="none" stroke="var(--bg-button)" strokeWidth="2.5" />
@@ -121,7 +119,7 @@ export default function ClaudeUsage(): JSX.Element | null {
           >
             <div className="flex items-center" style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
-                Claude Usage
+                {engine === 'codex' ? 'Codex Usage' : 'Claude Usage'}
               </div>
               <button
                 onClick={() => refresh(true)}

@@ -133,6 +133,7 @@ const api = {
     engine: 'claude' | 'codex'
     claudeFound: boolean
     codexFound: boolean
+    firstRun: boolean
   }> => ipcRenderer.invoke(IPC.ENGINE_INFO),
   changeTheme: (theme: 'dark' | 'light'): Promise<void> =>
     ipcRenderer.invoke(IPC.THEME_CHANGE, theme),

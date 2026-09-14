@@ -2,7 +2,7 @@ import { ipcMain, dialog, shell, BrowserWindow } from 'electron'
 import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { IPC } from '@shared/ipc-channels'
-import { loadSettings, saveSettings, Settings } from '../services/settings-persistence'
+import { loadSettings, saveSettings, settingsFileExists, Settings } from '../services/settings-persistence'
 import { getEngineInfo } from '../services/agent-engine'
 
 export function registerSettingsIpc(): void {
@@ -15,7 +15,9 @@ export function registerSettingsIpc(): void {
   // visibility in the renderer.
   ipcMain.handle(IPC.ENGINE_INFO, async () => {
     const settings = await loadSettings()
-    return getEngineInfo(settings.agentCli)
+    // firstRun: no settings.json yet → fresh install → the renderer shows the
+    // agent chooser. Upgrades have a settings file and skip it (auto-detect).
+    return { ...getEngineInfo(settings.agentCli), firstRun: !settingsFileExists() }
   })
 
   ipcMain.handle(IPC.SETTINGS_SAVE, async (_event, settings: Partial<Settings>) => {

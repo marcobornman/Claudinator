@@ -13,6 +13,7 @@ import CardDialog from './components/Board/CardDialog'
 import WhatsNewModal from './components/WhatsNew/WhatsNewModal'
 import Toasts from './components/Layout/Toasts'
 import AttentionBadges from './components/Layout/AttentionBadges'
+import AgentChoiceDialog from './components/Layout/AgentChoiceDialog'
 import { useUIStore } from './stores/ui-store'
 
 export default function App(): JSX.Element {
@@ -27,6 +28,8 @@ export default function App(): JSX.Element {
   const addCard = useBoardStore((s) => s.addCard)
   const updateCard = useBoardStore((s) => s.updateCard)
   const whatsNewOpen = useUIStore((s) => s.whatsNewOpen)
+  const settingsLoaded = useSettingsStore((s) => s.loaded)
+  const firstRun = useSettingsStore((s) => s.firstRun)
 
   // Disposing an xterm throws away its scrollback, and rebuilding it from the
   // main process's raw 1MB PTY ring buffer loses most of the visible history
@@ -94,6 +97,9 @@ export default function App(): JSX.Element {
 
       {/* What's New popup (shown after an update, or from About) */}
       {whatsNewOpen && <WhatsNewModal />}
+
+      {/* First-run agent chooser (fresh install: no settings.json yet) */}
+      {settingsLoaded && firstRun && <AgentChoiceDialog />}
 
       {/* Transient error/info toasts */}
       <Toasts />

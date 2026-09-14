@@ -27,6 +27,8 @@ interface SettingsState {
   engine: AgentEngine
   claudeFound: boolean
   codexFound: boolean
+  /** Fresh install (no settings.json yet) — the agent chooser must run. */
+  firstRun: boolean
 }
 
 interface SettingsActions {
@@ -39,6 +41,8 @@ interface SettingsActions {
   removePat: (id: string) => void
   saveAll: () => Promise<void>
   refreshEngineInfo: () => Promise<void>
+  /** First-run chooser: persist the picked agent (creates settings.json). */
+  chooseAgent: (engine: AgentEngine) => Promise<void>
   setTheme: (theme: Theme) => void
   setThemeOverrides: (theme: Theme, overrides: ThemeTemplate) => void
   applyThemeOverrides: () => void
@@ -126,6 +130,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
     engine: 'claude',
     claudeFound: true,
     codexFound: false,
+    firstRun: false,
 
     load: async () => {
       const settings = await window.api.loadSettings()
@@ -161,10 +166,21 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
     refreshEngineInfo: async () => {
       try {
         const info = await window.api.getEngineInfo()
-        set({ engine: info.engine, claudeFound: info.claudeFound, codexFound: info.codexFound })
+        set({
+          engine: info.engine,
+          claudeFound: info.claudeFound,
+          codexFound: info.codexFound,
+          firstRun: info.firstRun
+        })
       } catch {
         // keep previous values
       }
+    },
+
+    chooseAgent: async (engine: AgentEngine) => {
+      set({ agentCli: engine, firstRun: false })
+      await persist({ agentCli: engine })
+      await get().refreshEngineInfo()
     },
 
     setDefaultProjectDir: async (dir: string) => {
