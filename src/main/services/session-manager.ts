@@ -464,28 +464,37 @@ class SessionManager {
 
   // Locate a rollout file by conversation id anywhere under the sessions tree
   // (needed when resuming: the file lives in the folder of its original day).
+  // Tolerates stray files at any level and the legacy flat layout.
   private async findCodexRollout(id: string): Promise<string | null> {
     const root = join(homedir(), '.codex', 'sessions')
     const suffix = `-${id.toLowerCase()}.jsonl`
-    try {
-      const years = (await readdir(root)).sort().reverse()
-      for (const y of years) {
-        for (const m of (await readdir(join(root, y))).sort().reverse()) {
-          for (const d of (await readdir(join(root, y, m))).sort().reverse()) {
-            try {
-              for (const f of await readdir(join(root, y, m, d))) {
-                if (f.toLowerCase().endsWith(suffix)) return join(root, y, m, d, f)
-              }
-            } catch {
-              continue
-            }
-          }
+    const dirsDesc = async (p: string): Promise<string[]> => {
+      try {
+        const entries = await readdir(p, { withFileTypes: true })
+        return entries.filter((e) => e.isDirectory()).map((e) => e.name).sort().reverse()
+      } catch {
+        return []
+      }
+    }
+    const findIn = async (dir: string): Promise<string | null> => {
+      try {
+        for (const f of await readdir(dir)) {
+          if (f.toLowerCase().endsWith(suffix)) return join(dir, f)
+        }
+      } catch {
+        // unreadable — skip
+      }
+      return null
+    }
+    for (const y of await dirsDesc(root)) {
+      for (const m of await dirsDesc(join(root, y))) {
+        for (const d of await dirsDesc(join(root, y, m))) {
+          const hit = await findIn(join(root, y, m, d))
+          if (hit) return hit
         }
       }
-    } catch {
-      // no sessions tree yet
     }
-    return null
+    return findIn(root) // legacy flat layout
   }
 
   private startClaudeIdDetection(

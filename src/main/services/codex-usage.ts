@@ -39,38 +39,60 @@ function toLimit(kind: string, label: string, w: RawWindow | null | undefined): 
   }
 }
 
-/** Newest rollout file across the last ~14 day folders (newest mtime wins). */
+/** Subdirectories of `p`, sorted descending — tolerates stray files. */
+async function listDirsDesc(p: string): Promise<string[]> {
+  try {
+    const entries = await readdir(p, { withFileTypes: true })
+    return entries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort()
+      .reverse()
+  } catch {
+    return []
+  }
+}
+
+/** Newest rollout file across the last ~14 day folders (newest mtime wins).
+ *  Also scans the sessions root itself — older codex versions wrote rollouts
+ *  flat instead of under YYYY/MM/DD. */
 async function findNewestRollout(): Promise<{ path: string; mtimeMs: number } | null> {
   const root = join(homedir(), '.codex', 'sessions')
   let best: { path: string; mtimeMs: number } | null = null
-  try {
-    const dayDirs: string[] = []
-    for (const y of (await readdir(root)).sort().reverse().slice(0, 2)) {
-      for (const m of (await readdir(join(root, y))).sort().reverse().slice(0, 2)) {
-        for (const d of (await readdir(join(root, y, m))).sort().reverse()) {
-          dayDirs.push(join(root, y, m, d))
-          if (dayDirs.length >= 14) break
+
+  const scanDir = async (dir: string): Promise<void> => {
+    try {
+      for (const f of await readdir(dir)) {
+        if (!f.endsWith('.jsonl')) continue
+        const p = join(dir, f)
+        try {
+          const s = await stat(p)
+          if (!best || s.mtimeMs > best.mtimeMs) best = { path: p, mtimeMs: s.mtimeMs }
+        } catch {
+          continue
         }
+      }
+    } catch {
+      // dir unreadable — skip
+    }
+  }
+
+  const dayDirs: string[] = []
+  for (const y of (await listDirsDesc(root)).slice(0, 2)) {
+    for (const m of (await listDirsDesc(join(root, y))).slice(0, 2)) {
+      for (const d of await listDirsDesc(join(root, y, m))) {
+        dayDirs.push(join(root, y, m, d))
         if (dayDirs.length >= 14) break
       }
       if (dayDirs.length >= 14) break
     }
-    for (const dir of dayDirs) {
-      try {
-        for (const f of await readdir(dir)) {
-          if (!f.endsWith('.jsonl')) continue
-          const p = join(dir, f)
-          const s = await stat(p)
-          if (!best || s.mtimeMs > best.mtimeMs) best = { path: p, mtimeMs: s.mtimeMs }
-        }
-      } catch {
-        continue
-      }
-      if (best) break // day dirs are visited newest-first; first hit day wins
-    }
-  } catch {
-    return null
+    if (dayDirs.length >= 14) break
   }
+  for (const dir of dayDirs) {
+    await scanDir(dir)
+    if (best) break // day dirs are visited newest-first; first hit day wins
+  }
+  if (!best) await scanDir(root) // legacy flat layout
   return best
 }
 
