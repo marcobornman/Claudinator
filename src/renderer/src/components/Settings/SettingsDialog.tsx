@@ -3,7 +3,7 @@ import { useSettingsStore } from '@/stores/settings-store'
 import { useTitleBarDim } from '@/hooks/useTitleBarDim'
 import ThemeEditor from './ThemeEditor'
 import type { ThemeTemplate, ThemeOverrides, CustomTheme } from '@shared/models'
-import { MODEL_PRESETS, formatModelName } from '@shared/model-presets'
+import { presetsForEngine, formatModelName, type AgentEngine } from '@shared/model-presets'
 
 interface SettingsDialogProps {
   onClose: () => void
@@ -95,6 +95,8 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
   const [projectDir, setProjectDir] = useState(store.defaultProjectDir)
   const [notesDir, setNotesDir] = useState(store.notesDir ?? '')
   const [claudeModel, setClaudeModel] = useState(store.claudeModel ?? '')
+  const [codexModel, setCodexModel] = useState(store.codexModel ?? '')
+  const [agentCli, setAgentCli] = useState<'' | 'claude' | 'codex'>(store.agentCli ?? '')
   const [localRules, setLocalRules] = useState<string[]>(store.rules ?? [])
   const [localPats, setLocalPats] = useState<LocalPAT[]>(store.pats ?? [])
   const [newRule, setNewRule] = useState('')
@@ -129,15 +131,31 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
   const [cliState, setCliState] = useState<'idle' | 'updating' | 'done' | 'error'>('idle')
   const [cliMessage, setCliMessage] = useState('')
 
+  // Which engine the model picker edits: the explicit choice, or the
+  // auto-detected one (claude unless only codex is installed).
+  const autoEngine: AgentEngine = !store.claudeFound && store.codexFound ? 'codex' : 'claude'
+  const localEngine: AgentEngine = agentCli === '' ? autoEngine : agentCli
+  const modelPresets = presetsForEngine(localEngine)
+  const currentModel = localEngine === 'codex' ? codexModel : claudeModel
+  const setCurrentModel = localEngine === 'codex' ? setCodexModel : setClaudeModel
+
   // Model picker: track whether the user is in "custom raw id" mode. Seeded
-  // from the stored value not matching any preset.
+  // from the active engine's stored value not matching any preset.
   const [customModel, setCustomModel] = useState(
-    (store.claudeModel ?? '') !== '' && !MODEL_PRESETS.some((m) => m.value === store.claudeModel)
+    currentModel !== '' && !modelPresets.some((m) => m.value === currentModel)
   )
   const [modelOpen, setModelOpen] = useState(false)
   const modelLabel = customModel
     ? 'Custom…'
-    : MODEL_PRESETS.find((m) => m.value === claudeModel)?.label ?? formatModelName(claudeModel)
+    : modelPresets.find((m) => m.value === currentModel)?.label ?? formatModelName(currentModel)
+
+  const pickAgentCli = (value: '' | 'claude' | 'codex'): void => {
+    setAgentCli(value)
+    // Re-seed custom mode against the target engine's presets and model.
+    const engine: AgentEngine = value === '' ? autoEngine : value
+    const model = engine === 'codex' ? codexModel : claudeModel
+    setCustomModel(model !== '' && !presetsForEngine(engine).some((m) => m.value === model))
+  }
 
   const handleUpdateCli = async (): Promise<void> => {
     setCliState('updating')
@@ -415,6 +433,8 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
     await window.api.saveSettings({
       defaultProjectDir: projectDir.trim(),
       claudeModel: claudeModel.trim(),
+      agentCli,
+      codexModel: codexModel.trim(),
       notesDir: notesDir.trim(),
       rules: localRules,
       pats: localPats,
@@ -485,7 +505,48 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
             {activeSection === 'general' && (
               <div>
                 <div style={{ marginBottom: 24 }}>
-                  <label style={labelStyle}>Claude Model</label>
+                  <label style={labelStyle}>Agent</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(
+                      [
+                        { value: '' as const, label: `Auto (${autoEngine === 'codex' ? 'Codex' : 'Claude Code'})` },
+                        { value: 'claude' as const, label: 'Claude Code', missing: !store.claudeFound },
+                        { value: 'codex' as const, label: 'Codex', missing: !store.codexFound }
+                      ] as { value: '' | 'claude' | 'codex'; label: string; missing?: boolean }[]
+                    ).map((opt) => {
+                      const active = agentCli === opt.value
+                      return (
+                        <button
+                          key={opt.value || 'auto'}
+                          type="button"
+                          onClick={() => pickAgentCli(opt.value)}
+                          title={opt.missing ? 'CLI not found on PATH — sessions will fail to start until it is installed' : undefined}
+                          style={{
+                            flex: 1,
+                            borderRadius: 8,
+                            padding: '9px 12px',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            border: `1px solid ${active ? 'var(--accent)' : 'var(--border-input)'}`,
+                            backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-input)',
+                            color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            opacity: opt.missing ? 0.55 : 1
+                          }}
+                        >
+                          {opt.label}
+                          {opt.missing ? ' ⚠' : ''}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                    Which CLI powers every session (cards, notes, worktrees). Auto picks Claude Code unless only Codex is installed. Applies to sessions started after saving.
+                  </p>
+                </div>
+
+                <div style={{ marginBottom: 24 }}>
+                  <label style={labelStyle}>{localEngine === 'codex' ? 'Codex Model' : 'Claude Model'}</label>
                   <div style={{ position: 'relative' }}>
                     <button
                       type="button"
@@ -524,8 +585,8 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                             boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                           }}
                         >
-                          {[...MODEL_PRESETS, { value: CUSTOM_MODEL, label: 'Custom…' }].map((m) => {
-                            const active = m.value === CUSTOM_MODEL ? customModel : !customModel && m.value === claudeModel
+                          {[...modelPresets, { value: CUSTOM_MODEL, label: 'Custom…' }].map((m) => {
+                            const active = m.value === CUSTOM_MODEL ? customModel : !customModel && m.value === currentModel
                             return (
                               <button
                                 key={m.value || 'auto'}
@@ -535,7 +596,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                                     setCustomModel(true)
                                   } else {
                                     setCustomModel(false)
-                                    setClaudeModel(m.value)
+                                    setCurrentModel(m.value)
                                   }
                                   setModelOpen(false)
                                 }}
@@ -568,9 +629,9 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                   </div>
                   {customModel && (
                     <input
-                      value={claudeModel}
-                      onChange={(e) => setClaudeModel(e.target.value)}
-                      placeholder="e.g. claude-fable-5"
+                      value={currentModel}
+                      onChange={(e) => setCurrentModel(e.target.value)}
+                      placeholder={localEngine === 'codex' ? 'e.g. gpt-6-astra' : 'e.g. claude-fable-5'}
                       style={{ ...inputStyle, marginTop: 8 }}
                     />
                   )}
@@ -1237,7 +1298,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                     <path d="M5 7h6M5 9.5h4" />
                   </svg>
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
-                    {formatModelName(claudeModel)}
+                    {formatModelName(currentModel)}
                   </span>
                 </div>
                 <p style={{
@@ -1361,7 +1422,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                 {/* Claude CLI updater */}
                 <div style={{ width: '100%', maxWidth: 320, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-primary)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Claude CLI</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{store.engine === 'codex' ? 'Codex CLI' : 'Claude CLI'}</span>
                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {cliVersion ? `v${cliVersion}` : 'not found'}
                     </span>

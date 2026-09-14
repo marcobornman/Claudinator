@@ -1,7 +1,9 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { IPC } from '@shared/ipc-channels'
+import { modelFitsEngine } from '@shared/model-presets'
 import { sessionManager } from '../services/session-manager'
 import { loadSettings } from '../services/settings-persistence'
+import { resolveEngine } from '../services/agent-engine'
 
 export function registerSessionIpc(): void {
   ipcMain.handle(
@@ -17,6 +19,13 @@ export function registerSessionIpc(): void {
       }
     ) => {
       const settings = await loadSettings()
+      const engine = resolveEngine(settings.agentCli)
+      // A per-card override written under the other engine (before the Agent
+      // setting changed) is ignored rather than passed to the wrong CLI.
+      const override = args.model?.trim() ?? ''
+      const model =
+        (modelFitsEngine(override, engine) ? override : '') ||
+        (engine === 'codex' ? settings.codexModel : settings.claudeModel)
       const info = await sessionManager.start(
         args.cardId,
         args.cardTitle,
@@ -24,7 +33,8 @@ export function registerSessionIpc(): void {
         args.claudeSessionId,
         settings.rules,
         settings.pats,
-        args.model?.trim() || settings.claudeModel
+        model,
+        engine
       )
 
       const win = BrowserWindow.fromWebContents(event.sender)

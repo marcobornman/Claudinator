@@ -17,3 +17,16 @@ export function buildClaudeArgs(
   }
   return parts.join(' ')
 }
+
+// Codex has no --session-id equivalent (it generates its own id); fresh
+// sessions are bound afterwards by rollout-file detection (session_meta.cwd).
+export function buildCodexArgs(resumeSessionId?: string | null, model?: string): string {
+  const parts = ['codex']
+  if (resumeSessionId) {
+    parts.push('resume', `'${resumeSessionId.replace(/'/g, "''")}'`)
+  }
+  if (model) {
+    parts.push('--model', `'${model.replace(/'/g, "''")}'`)
+  }
+  return parts.join(' ')
+}

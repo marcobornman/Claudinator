@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Card } from '@shared/models'
-import { MODEL_PRESETS, formatModelName } from '@shared/model-presets'
+import { presetsForEngine, formatModelName } from '@shared/model-presets'
 import { useSettingsStore } from '@/stores/settings-store'
 import { useTitleBarDim } from '@/hooks/useTitleBarDim'
 
@@ -36,7 +36,8 @@ const labelStyle: React.CSSProperties = {
 
 export default function CardDialog({ card, onSave, onClose, onDelete }: CardDialogProps): JSX.Element {
   const defaultProjectDir = useSettingsStore((s) => s.defaultProjectDir)
-  const settingsModel = useSettingsStore((s) => s.claudeModel)
+  const engine = useSettingsStore((s) => s.engine)
+  const settingsModel = useSettingsStore((s) => (s.engine === 'codex' ? s.codexModel : s.claudeModel))
   const [title, setTitle] = useState(card?.title ?? '')
   const [description, setDescription] = useState(card?.description ?? '')
   const [projectDir, setProjectDir] = useState(card?.projectDir ?? defaultProjectDir)
@@ -46,7 +47,7 @@ export default function CardDialog({ card, onSave, onClose, onDelete }: CardDial
 
   // A custom model id set in Settings' "Custom…" field (or an old preset no
   // longer in the list) still needs to show up and stay selectable.
-  const modelOptions = MODEL_PRESETS.filter((m) => m.value !== '')
+  const modelOptions = presetsForEngine(engine).filter((m) => m.value !== '')
   const unknownModel = model !== FOLLOW_SETTINGS && !modelOptions.some((m) => m.value === model)
 
   useTitleBarDim()
@@ -196,7 +197,7 @@ export default function CardDialog({ card, onSave, onClose, onDelete }: CardDial
             style={{ ...inputStyle, cursor: 'pointer' }}
           >
             <option value={FOLLOW_SETTINGS}>
-              Default — {MODEL_PRESETS.find((m) => m.value === settingsModel)?.label ?? formatModelName(settingsModel)} (Settings)
+              Default — {presetsForEngine(engine).find((m) => m.value === settingsModel)?.label ?? formatModelName(settingsModel)} (Settings)
             </option>
             {modelOptions.map((m) => (
               <option key={m.value} value={m.value}>

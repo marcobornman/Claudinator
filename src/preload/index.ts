@@ -106,6 +106,8 @@ const api = {
   loadSettings: (): Promise<{
     defaultProjectDir: string
     claudeModel: string
+    agentCli: '' | 'claude' | 'codex'
+    codexModel: string
     notesDir: string
     rules: string[]
     pats: { id: string; name: string; value: string }[]
@@ -117,6 +119,8 @@ const api = {
   saveSettings: (settings: {
     defaultProjectDir: string
     claudeModel: string
+    agentCli: '' | 'claude' | 'codex'
+    codexModel: string
     notesDir: string
     rules: string[]
     pats: { id: string; name: string; value: string }[]
@@ -125,6 +129,11 @@ const api = {
     customThemes: CustomTheme[]
     activeCustomThemeId: string | null
   }): Promise<void> => ipcRenderer.invoke(IPC.SETTINGS_SAVE, settings),
+  getEngineInfo: (): Promise<{
+    engine: 'claude' | 'codex'
+    claudeFound: boolean
+    codexFound: boolean
+  }> => ipcRenderer.invoke(IPC.ENGINE_INFO),
   changeTheme: (theme: 'dark' | 'light'): Promise<void> =>
     ipcRenderer.invoke(IPC.THEME_CHANGE, theme),
   setTitleBarDim: (dimmed: boolean): Promise<void> =>

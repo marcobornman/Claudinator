@@ -3,10 +3,19 @@ import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { IPC } from '@shared/ipc-channels'
 import { loadSettings, saveSettings, Settings } from '../services/settings-persistence'
+import { getEngineInfo } from '../services/agent-engine'
 
 export function registerSettingsIpc(): void {
   ipcMain.handle(IPC.SETTINGS_LOAD, async () => {
     return await loadSettings()
+  })
+
+  // Resolved agent engine (auto-detect applied) + which CLIs are installed —
+  // drives the Settings picker labels, model preset lists, and usage-ring
+  // visibility in the renderer.
+  ipcMain.handle(IPC.ENGINE_INFO, async () => {
+    const settings = await loadSettings()
+    return getEngineInfo(settings.agentCli)
   })
 
   ipcMain.handle(IPC.SETTINGS_SAVE, async (_event, settings: Partial<Settings>) => {

@@ -2,6 +2,8 @@ import { ipcMain } from 'electron'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { IPC } from '@shared/ipc-channels'
+import { loadSettings } from '../services/settings-persistence'
+import { resolveEngine } from '../services/agent-engine'
 
 const execAsync = promisify(exec)
 
@@ -51,14 +53,15 @@ function cleanEnv(stripProxy = false): NodeJS.ProcessEnv {
   return env
 }
 
-// Run the `claude` binary through a shell so PATH resolution finds the
+// Run the agent binary through a shell so PATH resolution finds the
 // platform shim (e.g. claude.cmd on Windows). exec() uses a shell by default.
-async function runClaude(
+async function runCli(
+  bin: 'claude' | 'codex',
   argsLine: string,
   timeout: number,
   stripProxy = false
 ): Promise<{ stdout: string; stderr: string }> {
-  return await execAsync(`claude ${argsLine}`, {
+  return await execAsync(`${bin} ${argsLine}`, {
     timeout,
     windowsHide: true,
     env: cleanEnv(stripProxy)
@@ -74,25 +77,32 @@ function looksLikeRegistryUnreachable(text: string): boolean {
   )
 }
 
-// Run `claude update`, and if it fails in a way that looks like the registry
+// Run `<cli> update`, and if it fails in a way that looks like the registry
 // was unreachable, retry once with proxy vars stripped from the child env.
-async function runClaudeUpdate(timeout: number): Promise<{ stdout: string; stderr: string }> {
+async function runCliUpdate(
+  bin: 'claude' | 'codex',
+  timeout: number
+): Promise<{ stdout: string; stderr: string }> {
   try {
-    return await runClaude('update', timeout)
+    return await runCli(bin, 'update', timeout)
   } catch (err) {
     const e = err as Error & { stdout?: string; stderr?: string }
     const combined = `${e.message}\n${e.stdout ?? ''}\n${e.stderr ?? ''}`
     if (!looksLikeRegistryUnreachable(combined)) throw err
     // Fallback: a stale/dead proxy in the inherited env is the likely culprit —
     // retry without proxy vars so the child talks to the registry directly.
-    return await runClaude('update', timeout, true)
+    return await runCli(bin, 'update', timeout, true)
   }
+}
+
+async function currentEngine(): Promise<'claude' | 'codex'> {
+  return resolveEngine((await loadSettings()).agentCli)
 }
 
 export function registerCliIpc(): void {
   ipcMain.handle(IPC.CLI_VERSION, async (): Promise<CliVersion> => {
     try {
-      const { stdout } = await runClaude('--version', 30_000)
+      const { stdout } = await runCli(await currentEngine(), '--version', 30_000)
       const match = stdout.match(/(\d+\.\d+\.\d+)/)
       return { version: match ? match[1] : stdout.trim() }
     } catch (err) {
@@ -101,9 +111,23 @@ export function registerCliIpc(): void {
   })
 
   ipcMain.handle(IPC.CLI_UPDATE, async (): Promise<CliUpdateResult> => {
+    const engine = await currentEngine()
+    if (engine === 'codex') {
+      // `codex update` runs npm install -g under the hood; judge loosely from
+      // output — the claude-specific lock/error parsing below doesn't apply.
+      try {
+        const { stdout, stderr } = await runCliUpdate('codex', 180_000)
+        const output = `${stdout}\n${stderr}`.trim()
+        const versions = output.match(/(\d+\.\d+\.\d+)\s*(?:->|to)\s*v?(\d+\.\d+\.\d+)/i)
+        const alreadyLatest = /already|up[- ]?to[- ]?date|latest/i.test(output) && !versions
+        return { ok: true, from: versions?.[1], to: versions?.[2], alreadyLatest, output }
+      } catch (err) {
+        return { ok: false, alreadyLatest: false, output: '', error: (err as Error).message }
+      }
+    }
     try {
       // `claude update` can download + install, so allow a generous timeout.
-      const { stdout, stderr } = await runClaudeUpdate(180_000)
+      const { stdout, stderr } = await runCliUpdate('claude', 180_000)
       const output = `${stdout}\n${stderr}`.trim()
       const updated = output.match(/updated from (\d+\.\d+\.\d+) to (?:version )?(\d+\.\d+\.\d+)/i)
       // `claude update` exits 0 even when the install step fails (e.g. the

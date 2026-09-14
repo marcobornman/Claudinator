@@ -36,6 +36,29 @@ const DECISION_RE = /to\s*navigate|Enter\s*to\s*(?:select|confirm)|Esc\s*to\s*ca
 // was answered during the turn, so a stale prompt can't stay "newest".
 const RUNNING_RE = /esc\s*to\s*interrupt|\(\d+s\s*·|[✻✶✽✢·*]\s*\w+\s*for\s*\d+s\b/gi
 
+// Codex TUI (captured empirically from codex 0.153.4 under ConPTY):
+// menus (update, trust-folder, command approval) all end with "Press enter to
+// confirm/continue" and list numbered options behind a "›" marker; the
+// approval prompt opens with "Would you like to run the following command?".
+// The working footer is "• Working (3s • esc to interrupt)" — bullet •, not
+// Claude's middle dot — redrawn constantly while generating, so its last
+// occurrence lands after any prompt text that was answered during the turn.
+const CODEX_DECISION_RE = /Would\s*you\s*like\s*to\s*run|Press\s*enter\s*to\s*(?:confirm|continue)|Do\s*you\s*trust|[❯›▶]\s*\d+\.\s*[A-Za-z]/gi
+const CODEX_RUNNING_RE = /esc\s*to\s*interrupt|\(\d+s\s*[·•]|•\s*W?orking\b/gi
+
+// While a command-approval modal is pending, codex floods the terminal title
+// (OSC 0) with "[ ! ] Action Required" ~2×/s — which both proves a decision is
+// pending and, because the flood dominates the buffer tail, ages the modal's
+// text out of the stripped window. While generating, the title is a braille
+// spinner + "work". These match against the RAW buffer (OSC is otherwise
+// stripped), and the title channel wins whenever it has the newer signal.
+// Startup menus (update, trust-folder) set no titles — text patterns cover
+// those.
+const CODEX_TITLE_DECISION_RE = /\]0;\[ [!.] \] Action Required/g
+const CODEX_TITLE_RUNNING_RE = /\]0;[⠀-⣿] work\x07/g
+
+export type AttentionEngine = 'claude' | 'codex'
+
 function lastMatchIndex(t: string, re: RegExp): number {
   re.lastIndex = 0
   let pos = -1
@@ -51,9 +74,17 @@ function lastMatchIndex(t: string, re: RegExp): number {
 // the most recent working signal. A dismissed or timed-out prompt (e.g.
 // AskUserQuestion's "No response after 60s — continued") leaves its footer
 // text in the tail while Claude keeps generating — newest signal wins.
-export function isDecisionPrompt(raw: string): boolean {
+export function isDecisionPrompt(raw: string, engine: AttentionEngine = 'claude'): boolean {
+  if (engine === 'codex') {
+    // Title channel first: a pending approval modal floods "Action Required".
+    const titleDecision = lastMatchIndex(raw, CODEX_TITLE_DECISION_RE)
+    const titleRunning = lastMatchIndex(raw, CODEX_TITLE_RUNNING_RE)
+    if (titleDecision >= 0 && titleDecision > titleRunning) return true
+  }
   const t = stripAnsi(raw)
-  const decisionPos = lastMatchIndex(t, DECISION_RE)
+  const decisionRe = engine === 'codex' ? CODEX_DECISION_RE : DECISION_RE
+  const runningRe = engine === 'codex' ? CODEX_RUNNING_RE : RUNNING_RE
+  const decisionPos = lastMatchIndex(t, decisionRe)
   if (decisionPos < 0) return false
-  return decisionPos > lastMatchIndex(t, RUNNING_RE)
+  return decisionPos > lastMatchIndex(t, runningRe)
 }

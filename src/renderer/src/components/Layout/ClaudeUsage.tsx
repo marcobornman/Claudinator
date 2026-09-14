@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { UsageLimitsResult } from '@shared/usage'
+import { useSettingsStore } from '@/stores/settings-store'
 
 // Sidebar ring showing the 5-hour session window %, with a popover breaking
 // down every plan limit (session, weekly, model-scoped weekly) and its reset
@@ -32,6 +33,9 @@ function updatedAgo(updatedAt: number, now: number): string {
 }
 
 export default function ClaudeUsage(): JSX.Element | null {
+  // The ring reads the Claude plan's OAuth usage endpoint — meaningless (and
+  // noisy: token errors) when sessions run on Codex, so hide it there.
+  const engine = useSettingsStore((s) => s.engine)
   const [usage, setUsage] = useState<UsageLimitsResult | null>(null)
   const [open, setOpen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -46,10 +50,11 @@ export default function ClaudeUsage(): JSX.Element | null {
   }, [])
 
   useEffect(() => {
+    if (engine !== 'claude') return // don't poll the Claude OAuth endpoint in codex mode
     refresh()
     const iv = setInterval(() => refresh(), 5 * 60_000)
     return () => clearInterval(iv)
-  }, [refresh])
+  }, [refresh, engine])
 
   // Keep countdowns ticking while the popover is open.
   useEffect(() => {
@@ -59,6 +64,7 @@ export default function ClaudeUsage(): JSX.Element | null {
     return () => clearInterval(iv)
   }, [open, refresh])
 
+  if (engine !== 'claude') return null
   if (!usage || (usage.limits.length === 0 && !usage.error)) return null
 
   const session = usage.limits.find((l) => l.kind === 'session')

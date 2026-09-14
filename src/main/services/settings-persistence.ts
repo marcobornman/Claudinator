@@ -21,6 +21,10 @@ export interface RemoteSettings {
 export interface Settings {
   defaultProjectDir: string
   claudeModel: string
+  /** Which agent CLI powers sessions: '' = auto-detect, or 'claude'/'codex'. */
+  agentCli: '' | 'claude' | 'codex'
+  /** Default model for codex sessions ('' = codex's own default). */
+  codexModel: string
   notesDir: string
   rules: string[]
   pats: PAT[]
@@ -40,7 +44,7 @@ function getSettingsPath(): string {
 }
 
 function createDefaultSettings(): Settings {
-  return { defaultProjectDir: '', claudeModel: 'claude-opus-5', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
+  return { defaultProjectDir: '', claudeModel: 'claude-opus-5', agentCli: '', codexModel: '', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
 }
 
 export async function loadSettings(): Promise<Settings> {

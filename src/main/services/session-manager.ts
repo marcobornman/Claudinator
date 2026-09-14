@@ -1,10 +1,11 @@
 import { v4 as uuid } from 'uuid'
 import { SessionInfo, SessionStatus } from '@shared/models'
-import { buildClaudeArgs } from './claude-cli'
+import type { AgentEngine } from '@shared/model-presets'
+import { buildClaudeArgs, buildCodexArgs } from './claude-cli'
 import { isDecisionPrompt } from './attention'
 import { timeTracker } from './time-tracker'
 import { readFile, writeFile, readdir, stat, open } from 'fs/promises'
-import { join } from 'path'
+import { join, sep } from 'path'
 import { homedir } from 'os'
 import { PAT } from './settings-persistence'
 
@@ -54,6 +55,11 @@ interface ManagedSession {
   // new conversation with no content link to the old one, so this is the only
   // signal tying the new file to this session rather than a neighbouring card.
   clearSeenAt?: number
+  // Which agent CLI runs in this pty — selects attention patterns, id
+  // detection, and context-info source.
+  engine: AgentEngine
+  // Path of the codex rollout file the session is bound to (cached once found).
+  codexRolloutPath?: string
 }
 
 class SessionManager {
@@ -70,7 +76,8 @@ class SessionManager {
     claudeSessionId?: string | null,
     rules?: string[],
     pats?: PAT[],
-    claudeModel?: string
+    claudeModel?: string,
+    engine: AgentEngine = 'claude'
   ): Promise<SessionInfo> {
     if (!pty) {
       throw new Error(
@@ -79,12 +86,14 @@ class SessionManager {
     }
 
     const id = uuid()
-    // Fresh sessions get an app-generated conversation id passed to the CLI
-    // via --session-id, so the binding is certain from the first message —
-    // cards sharing a folder can no longer adopt each other's conversations.
+    // Fresh CLAUDE sessions get an app-generated conversation id passed via
+    // --session-id, so the binding is certain from the first message — cards
+    // sharing a folder can no longer adopt each other's conversations.
     // Resumes fork to a NEW id on the first message, so those still rely on
-    // detection (which can prove the fork by content, see below).
-    const launchId = claudeSessionId ? null : uuid()
+    // detection (which can prove the fork by content, see below). Codex has
+    // no such flag — its sessions are bound by rollout cwd detection.
+    const launchId = claudeSessionId || engine === 'codex' ? null : uuid()
+    // (resume or codex → no launch id; fresh claude → app-generated id)
     const info: SessionInfo = {
       id,
       cardId,
@@ -94,7 +103,8 @@ class SessionManager {
       pid: null
     }
 
-    // Write CLAUDE.md if rules exist and projectDir is set
+    // Write the rules file if rules exist and projectDir is set — CLAUDE.md
+    // for Claude Code, AGENTS.md (the convention codex reads) for Codex.
     if (rules && rules.length > 0 && projectDir) {
       const BEGIN_MARKER = '<!-- BEGIN Claude Orchestrator Rules -->'
       const END_MARKER = '<!-- END Claude Orchestrator Rules -->'
@@ -105,7 +115,7 @@ class SessionManager {
         '\n' +
         END_MARKER
 
-      const claudeMdPath = join(projectDir, 'CLAUDE.md')
+      const claudeMdPath = join(projectDir, engine === 'codex' ? 'AGENTS.md' : 'CLAUDE.md')
       let existing = ''
       try {
         existing = await readFile(claudeMdPath, 'utf-8')
@@ -156,7 +166,10 @@ class SessionManager {
       rows: 30,
       cwd: projectDir || process.env.USERPROFILE || process.env.HOME || '.',
       env: cleanEnv,
-      useConpty: false
+      // Codex's TUI is unstable under winpty (crashes on some keypresses,
+      // verified empirically) but fine under ConPTY; Claude is the reverse
+      // history — keep its battle-tested winpty path unchanged.
+      useConpty: engine === 'codex'
     })
 
     info.pid = ptyProcess.pid
@@ -171,7 +184,8 @@ class SessionManager {
       claudeIdListeners: new Set(),
       statusListeners: new Set(),
       cols: 120,
-      rows: 30
+      rows: 30,
+      engine
     }
 
     ptyProcess.onData((data) => {
@@ -206,19 +220,26 @@ class SessionManager {
 
     this.sessions.set(id, managed)
 
-    // Send the claude command into the shell
-    const claudeCmd = buildClaudeArgs(cardTitle, claudeSessionId, claudeModel, launchId)
+    // Send the agent command into the shell
+    const agentCmd =
+      engine === 'codex'
+        ? buildCodexArgs(claudeSessionId, claudeModel)
+        : buildClaudeArgs(cardTitle, claudeSessionId, claudeModel, launchId)
     const startedAt = Date.now()
-    ptyProcess.write(claudeCmd + '\r')
+    ptyProcess.write(agentCmd + '\r')
 
-    // Detect the Claude conversation ID from the filesystem.
-    // The .jsonl file is only created when the first message is sent, so we
-    // poll while the session is alive. This also runs for RESUMED sessions:
+    // Detect the conversation ID from the filesystem.
+    // The transcript file is only created when the first message is sent, so
+    // we poll while the session is alive. This also runs for RESUMED sessions:
     // `claude --resume` forks the conversation into a new file with a new id,
     // so the id we were handed goes stale on the first message — tracking the
     // newest file keeps the context badge live and the card's resume id
     // pointing at the latest state (same applies to /clear or /new mid-session).
-    this.startClaudeIdDetection(id, projectDir, startedAt, launchId)
+    if (engine === 'codex') {
+      this.startCodexIdDetection(id, projectDir, startedAt)
+    } else {
+      this.startClaudeIdDetection(id, projectDir, startedAt, launchId)
+    }
 
     return info
   }
@@ -350,6 +371,7 @@ class SessionManager {
   async getContextInfo(sessionId: string): Promise<string | null> {
     const managed = this.sessions.get(sessionId)
     if (!managed) return null
+    if (managed.engine === 'codex') return this.getCodexContextInfo(managed)
     const claudeId = managed.info.claudeSessionId
     const projectDir = managed.info.projectDir
     if (!claudeId || !projectDir) return null
@@ -400,6 +422,68 @@ class SessionManager {
       if (pendingCompactTokens !== null) return format(pendingCompactTokens, '')
     } catch {
       // file doesn't exist yet or can't be read
+    }
+    return null
+  }
+
+  // Codex context usage comes from the rollout's token_count events, which
+  // carry both the live context size (last_token_usage.total_tokens) and the
+  // model's window (model_context_window) — no per-model table needed.
+  private async getCodexContextInfo(managed: ManagedSession): Promise<string | null> {
+    const id = managed.info.claudeSessionId
+    if (!id) return null
+    if (!managed.codexRolloutPath) {
+      managed.codexRolloutPath = (await this.findCodexRollout(id)) ?? undefined
+      if (!managed.codexRolloutPath) return null
+    }
+    try {
+      const fh = await open(managed.codexRolloutPath, 'r')
+      try {
+        const { size } = await fh.stat()
+        const readLen = Math.min(size, 128 * 1024)
+        const buf = Buffer.alloc(readLen)
+        await fh.read(buf, 0, readLen, size - readLen)
+        const tail = buf.toString('utf-8')
+        const usage = [...tail.matchAll(/"last_token_usage":\{[^}]*"total_tokens":(\d+)/g)].pop()
+        const window = [...tail.matchAll(/"model_context_window":(\d+)/g)].pop()
+        if (!usage || !window) return null
+        const tokens = Number(usage[1])
+        const limit = Number(window[1])
+        if (!limit) return null
+        const pct = Math.round((tokens / limit) * 100)
+        const k = tokens >= 1000 ? (tokens / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(tokens)
+        return `${pct}% (${k})`
+      } finally {
+        await fh.close()
+      }
+    } catch {
+      managed.codexRolloutPath = undefined // file moved/archived — re-find next call
+      return null
+    }
+  }
+
+  // Locate a rollout file by conversation id anywhere under the sessions tree
+  // (needed when resuming: the file lives in the folder of its original day).
+  private async findCodexRollout(id: string): Promise<string | null> {
+    const root = join(homedir(), '.codex', 'sessions')
+    const suffix = `-${id.toLowerCase()}.jsonl`
+    try {
+      const years = (await readdir(root)).sort().reverse()
+      for (const y of years) {
+        for (const m of (await readdir(join(root, y))).sort().reverse()) {
+          for (const d of (await readdir(join(root, y, m))).sort().reverse()) {
+            try {
+              for (const f of await readdir(join(root, y, m, d))) {
+                if (f.toLowerCase().endsWith(suffix)) return join(root, y, m, d, f)
+              }
+            } catch {
+              continue
+            }
+          }
+        }
+      }
+    } catch {
+      // no sessions tree yet
     }
     return null
   }
@@ -546,6 +630,120 @@ class SessionManager {
     setTimeout(poll, 3000)
   }
 
+  // Codex writes each conversation to ~/.codex/sessions/YYYY/MM/DD/
+  // rollout-<ts>-<uuid>.jsonl, whose first line (session_meta) records the
+  // cwd — so unlike Claude, ownership is provable directly: a fresh rollout
+  // in OUR folder, created after WE launched, unclaimed by other sessions.
+  private startCodexIdDetection(sessionId: string, projectDir: string, startedAfter: number): void {
+    const sessionsRoot = join(homedir(), '.codex', 'sessions')
+    const pollIntervalMs = 5000
+    const normalize = (p: string): string =>
+      p.replace(/[\\/]+$/, '').replace(/\//g, sep).toLowerCase()
+    const wantCwd = normalize(projectDir)
+    // First-line cwd per rollout file, read once (null = not yet readable).
+    const cwdCache = new Map<string, string | null>()
+
+    const rolloutCwd = async (filePath: string): Promise<string | null> => {
+      const cached = cwdCache.get(filePath)
+      if (cached !== undefined && cached !== null) return cached
+      try {
+        const fh = await open(filePath, 'r')
+        try {
+          const buf = Buffer.alloc(16 * 1024)
+          const { bytesRead } = await fh.read(buf, 0, buf.length, 0)
+          if (bytesRead === 0) return null // meta not flushed yet — retry next poll
+          const firstLine = buf.toString('utf-8', 0, bytesRead).split('\n', 1)[0]
+          const cwd = JSON.parse(firstLine)?.payload?.cwd
+          if (typeof cwd !== 'string') return null
+          const norm = normalize(cwd)
+          cwdCache.set(filePath, norm)
+          return norm
+        } finally {
+          await fh.close()
+        }
+      } catch {
+        return null
+      }
+    }
+
+    const dayDirs = (): string[] => {
+      // Launch day and today (local dates, matching codex's folder layout) —
+      // covers sessions that span midnight.
+      const days = new Set<string>()
+      for (const t of [startedAfter, Date.now()]) {
+        const d = new Date(t)
+        days.add(
+          join(
+            sessionsRoot,
+            String(d.getFullYear()),
+            String(d.getMonth() + 1).padStart(2, '0'),
+            String(d.getDate()).padStart(2, '0')
+          )
+        )
+      }
+      return [...days]
+    }
+
+    const poll = async (): Promise<void> => {
+      const managed = this.sessions.get(sessionId)
+      if (!managed || managed.info.status === 'stopped') return
+
+      const candidates: { id: string; path: string; mtime: number }[] = []
+      for (const dir of dayDirs()) {
+        try {
+          for (const file of await readdir(dir)) {
+            const m = file.match(/^rollout-.*-([0-9a-f-]{36})\.jsonl$/i)
+            if (!m || !UUID_RE.test(m[1])) continue
+            const filePath = join(dir, file)
+            try {
+              const fileStat = await stat(filePath)
+              if (
+                fileStat.mtimeMs >= startedAfter - 5000 &&
+                fileStat.mtimeMs > (managed.manualIdAt ?? 0)
+              ) {
+                candidates.push({ id: m[1], path: filePath, mtime: fileStat.mtimeMs })
+              }
+            } catch {
+              continue
+            }
+          }
+        } catch {
+          // day folder may not exist yet
+        }
+      }
+
+      const claimed = new Set<string>()
+      for (const [otherId, other] of this.sessions) {
+        if (otherId === sessionId || other.info.status === 'stopped') continue
+        if (other.info.claudeSessionId) claimed.add(other.info.claudeSessionId)
+      }
+
+      candidates.sort((a, b) => b.mtime - a.mtime)
+      for (const candidate of candidates) {
+        if (candidate.id === managed.info.claudeSessionId) {
+          managed.codexRolloutPath = candidate.path
+          break // newest matching activity is already ours
+        }
+        if (claimed.has(candidate.id)) continue
+        if ((await rolloutCwd(candidate.path)) !== wantCwd) continue
+
+        managed.info.claudeSessionId = candidate.id
+        managed.codexRolloutPath = candidate.path
+        for (const listener of managed.claudeIdListeners) {
+          listener(candidate.id)
+        }
+        break
+      }
+
+      const m = this.sessions.get(sessionId)
+      if (m && m.info.status !== 'stopped') {
+        setTimeout(poll, pollIntervalMs)
+      }
+    }
+
+    setTimeout(poll, 3000)
+  }
+
   private parseCwdFromBuffer(sessionId: string): string | null {
     const managed = this.sessions.get(sessionId)
     if (!managed) return null
@@ -610,7 +808,7 @@ class SessionManager {
   private detectAttention(managed: ManagedSession): void {
     if (managed.info.status === 'stopped') return
 
-    if (isDecisionPrompt(managed.buffer.slice(-1200))) {
+    if (isDecisionPrompt(managed.buffer.slice(-1200), managed.engine)) {
       this.clearIdleTimer(managed)
       this.setStatus(managed, 'decision')
       return
@@ -622,7 +820,7 @@ class SessionManager {
     managed.idleTimer = setTimeout(() => {
       managed.idleTimer = undefined
       if (managed.info.status === 'stopped') return
-      const next = isDecisionPrompt(managed.buffer.slice(-3000)) ? 'decision' : 'waiting'
+      const next = isDecisionPrompt(managed.buffer.slice(-3000), managed.engine) ? 'decision' : 'waiting'
       this.setStatus(managed, next)
     }, 3000)
   }
