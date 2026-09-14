@@ -4,6 +4,17 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.28] - 2026-09-14
+
+### Added
+- Codex support: the orchestrator can now run OpenAI's Codex CLI instead of Claude Code. A first-run chooser on fresh installs asks which agent to use (showing what's installed), and Settings → General gets an Agent picker (Auto / Claude Code / Codex) — Auto picks Claude unless only Codex is on the machine, so a Codex-only laptop works with zero config. The one switch drives everything: sessions launch `codex` (resume via `codex resume <uuid>`), model dropdowns swap to the GPT family (Settings and per-card), rules write `AGENTS.md`, and "Check for CLI Updates" runs `codex update`.
+- Codex sessions bind to their conversation by proof: each Codex rollout file records the folder it started in, so a card only ever adopts a conversation from its own directory. The context badge reads the rollout's token counts (the file includes the model's exact context window), and `/new` in the TUI rebinds the card to the fresh conversation automatically.
+- Codex attention detection, built from captured real TUI output: menus and command approvals turn the dot orange (including via the "Action Required" title-flood Codex emits while an approval sits unanswered — the signal that survives long waits), and the working spinner keeps it green. Validated 9/9 against recorded PTY streams.
+- The usage ring works in Codex mode too: 5-hour Session and 7-day Weekly windows with reset countdowns, read from Codex's own local session files — no network calls, nothing modified. (Numbers refresh as Codex sessions produce output.)
+
+### Fixed
+- Codex's TUI crashes under winpty, so Codex sessions run under ConPTY; Claude sessions keep their existing winpty path unchanged. Stale per-card model overrides from the other engine are ignored instead of being passed to the wrong CLI, and every `~/.claude` reader degrades cleanly on a machine that has never run Claude.
+
 ## [0.1.27] - 2026-09-07
 
 ### Added
