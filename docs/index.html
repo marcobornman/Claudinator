@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Claude Code Orchestrator — Download</title>
+<meta name="description" content="A desktop Kanban board for managing parallel Claude Code and Codex CLI sessions on Windows." />
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --text: #e6e6e6;
+    --muted: #9d9d9d;
+    --accent: #3b78ff;
+    --green: #3fb950;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 36px;
+    text-align: center;
+  }
+  .logo {
+    font-size: 40px;
+    margin-bottom: 14px;
+  }
+  h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .tagline { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 28px; }
+  .version {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 14px;
+    margin-bottom: 24px;
+  }
+  .version b { color: var(--text); font-weight: 600; }
+  .dl {
+    display: block;
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 10px;
+    transition: filter 0.15s;
+  }
+  .dl:hover { filter: brightness(1.12); }
+  .dl.disabled { background: var(--border); color: var(--muted); pointer-events: none; }
+  .size { font-size: 12px; color: var(--muted); margin-bottom: 26px; }
+  .notes {
+    text-align: left;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+    margin-bottom: 22px;
+  }
+  .notes b { color: var(--text); display: block; margin-bottom: 6px; font-size: 13px; }
+  .links { font-size: 13px; }
+  .links a { color: var(--accent); text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  .sep { color: var(--border); margin: 0 10px; }
+  .footnote { font-size: 11.5px; color: var(--muted); margin-top: 22px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🗂️⚡</div>
+    <h1>Claude Code Orchestrator</h1>
+    <p class="tagline">A desktop Kanban board for running parallel Claude Code and Codex CLI sessions on Windows — with board dots that know when an agent needs you, and a phone remote for the couch.</p>
+
+    <div class="version" id="version">checking latest version…</div>
+
+    <a class="dl disabled" id="dl" href="https://github.com/marcobornman/Claudinator/releases/latest">Download for Windows</a>
+    <div class="size" id="size">&nbsp;</div>
+
+    <div class="notes" id="notes" hidden></div>
+
+    <div class="links">
+      <a href="https://github.com/marcobornman/Claudinator/releases">All releases</a>
+      <span class="sep">·</span>
+      <a href="https://github.com/marcobornman/Claudinator">GitHub</a>
+    </div>
+
+    <p class="footnote">Requires the Claude Code or Codex CLI installed. The app auto-updates itself after install, so you only need this download once.</p>
+  </div>
+
+<script>
+  (async function () {
+    var versionEl = document.getElementById('version')
+    var dl = document.getElementById('dl')
+    var sizeEl = document.getElementById('size')
+    try {
+      var res = await fetch('https://api.github.com/repos/marcobornman/Claudinator/releases/latest')
+      if (!res.ok) throw new Error(res.status)
+      var rel = await res.json()
+      var exe = (rel.assets || []).find(function (a) { return a.name.endsWith('.exe') })
+      versionEl.innerHTML = 'Latest: <b>v' + (rel.tag_name || '').replace(/^v/, '') + '</b> · ' +
+        new Date(rel.published_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      if (exe) {
+        dl.href = exe.browser_download_url
+        dl.classList.remove('disabled')
+        dl.textContent = 'Download for Windows'
+        sizeEl.textContent = (exe.size / 1048576).toFixed(0) + ' MB · ' + exe.name
+      } else {
+        dl.classList.remove('disabled') // falls back to the releases page
+      }
+      if (rel.body && rel.body.trim()) {
+        var notes = document.getElementById('notes')
+        notes.hidden = false
+        notes.innerHTML = '<b>What’s new</b>'
+        var p = document.createElement('div')
+        p.textContent = rel.body.trim()
+        p.style.whiteSpace = 'pre-wrap'
+        notes.appendChild(p)
+      }
+    } catch (e) {
+      versionEl.textContent = 'Couldn’t reach GitHub — the button links to the releases page.'
+      dl.classList.remove('disabled')
+    }
+  })()
+</script>
+</body>
+</html>
