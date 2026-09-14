@@ -10,6 +10,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.28',
+    date: '2026-09-14',
+    summary: 'Codex joins the board — run OpenAI\'s CLI with everything you already have.',
+    highlights: [
+      'Pick your agent: fresh installs ask on first launch (Claude Code or Codex, showing what\'s installed), and Settings → General has the switch — Auto picks Claude unless only Codex is on the machine, so a Codex-only laptop just works.',
+      'The whole board speaks Codex when you switch: sessions launch and resume the codex CLI, model dropdowns show the GPT family, cards bind to conversations by folder proof from Codex\'s own session files, and the context badge shows real usage against the model\'s exact window.',
+      'Board dots understand the Codex TUI (from captured real output): command approvals and menus pulse orange — even ones left waiting for minutes — and the working spinner keeps things green.',
+      'The usage ring now shows Codex limits in Codex mode: 5-hour Session and 7-day Weekly windows with reset countdowns, read locally from Codex\'s session files. No network, nothing touched.'
+    ]
+  },
+  {
     version: '0.1.27',
     date: '2026-09-07',
     summary: 'Your markdown viewer now, and a context badge that believes in /compact.',
