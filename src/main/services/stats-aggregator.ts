@@ -23,7 +23,7 @@ interface Pricing {
   cacheWrite: number
   cacheRead: number
 }
-type Family = 'fable' | 'opus' | 'opusLegacy' | 'sonnet' | 'haiku' | 'default'
+type Family = 'fable' | 'opus' | 'opusLegacy' | 'sonnet' | 'haiku' | 'codex' | 'default'
 const PRICING: Record<Family, Pricing> = {
   fable: { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 },
   opus: { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
@@ -31,11 +31,15 @@ const PRICING: Record<Family, Pricing> = {
   opusLegacy: { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 },
   sonnet: { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
   haiku: { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
+  // Codex runs on a ChatGPT subscription — no per-token list price to
+  // estimate against, so its tokens are counted but costed at 0.
+  codex: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 },
   default: { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }
 }
 
 function modelFamily(model: string): Family {
   const m = model.toLowerCase()
+  if (m.startsWith('gpt') || m.includes('codex')) return 'codex'
   if (m.includes('fable') || m.includes('mythos')) return 'fable'
   if (m.includes('opus')) {
     // Legacy = Opus 4.1, 4.0 (dated id: claude-opus-4-20250514) and Opus 3
@@ -49,6 +53,13 @@ function modelFamily(model: string): Family {
 
 function modelLabel(model: string): string {
   const m = model.toLowerCase()
+  if (m.startsWith('gpt')) {
+    // 'gpt-6-astra' → 'GPT-6-Astra'
+    return model
+      .split('-')
+      .map((p, i) => (i === 0 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1)))
+      .join('-')
+  }
   if (m.includes('fable') || m.includes('mythos')) return 'Fable'
   if (m.includes('opus')) return 'Opus'
   if (m.includes('sonnet')) return 'Sonnet'
@@ -63,6 +74,7 @@ const MODEL_COLORS: Record<string, string> = {
   Haiku: '#22c55e'
 }
 function modelColor(label: string): string {
+  if (label.startsWith('GPT')) return '#10a37f'
   return MODEL_COLORS[label] ?? '#94a3b8'
 }
 
@@ -226,6 +238,9 @@ async function scanRaw(): Promise<RawBuckets> {
   const nowMs = Date.now()
   const projectsRoot = join(homedir(), '.claude', 'projects')
   const files = await listTranscripts(projectsRoot)
+  // Codex rollouts live under ~/.codex/sessions (dated subfolders or legacy
+  // flat); both agents' usage merges into the same day buckets.
+  const codexFiles = await listTranscripts(join(homedir(), '.codex', 'sessions'))
 
   const byDay = new Map<string, DayBucket>()
   let firstDate = ''
@@ -326,11 +341,128 @@ async function scanRaw(): Promise<RawBuckets> {
     }
   }
 
+  // ---- Codex rollouts: usage comes from token_usage_record lines (one per
+  // API response, deduped by response_id); model/cwd/session arrive on other
+  // line types and are tracked per file. ----
+  interface CodexFileState {
+    cwd?: string
+    model: string
+    sid?: string
+    lastResp?: string
+  }
+  const codexState = new Map<string, CodexFileState>()
+
+  const handleCodexLine = (line: string, file: string): void => {
+    if (line.length < 2 || line[0] !== '{') return
+    let obj: {
+      type?: string
+      timestamp?: string
+      payload?: Record<string, unknown> & {
+        usage?: {
+          input_tokens?: number
+          cached_input_tokens?: number
+          cache_write_input_tokens?: number
+          output_tokens?: number
+        }
+        state?: { collaboration_mode?: { model?: string } }
+        collaboration_mode?: { model?: string }
+      }
+    }
+    try {
+      obj = JSON.parse(line)
+    } catch {
+      return
+    }
+    const p = obj.payload
+    if (!p || typeof p !== 'object') return
+    let st = codexState.get(file)
+    if (!st) {
+      st = { model: 'gpt' }
+      codexState.set(file, st)
+    }
+    const ts = obj.timestamp
+
+    if (obj.type === 'session_meta') {
+      if (typeof p.cwd === 'string') st.cwd = p.cwd
+      if (typeof p.session_id === 'string') st.sid = p.session_id
+      return
+    }
+    if (obj.type === 'turn_context') {
+      if (typeof p.cwd === 'string') st.cwd = p.cwd
+      const m = (typeof p.model === 'string' ? p.model : undefined) ?? p.collaboration_mode?.model
+      if (typeof m === 'string' && m) st.model = m
+      return
+    }
+    if (obj.type === 'world_state') {
+      const m = p.state?.collaboration_mode?.model
+      if (typeof m === 'string' && m) st.model = m
+      return
+    }
+    if (obj.type === 'response_item' && ts) {
+      if (p.type === 'custom_tool_call' || p.type === 'function_call' || p.type === 'local_shell_call') {
+        const day = localDay(ts)
+        const b = byDay.get(day) ?? emptyBucket()
+        b.toolCalls += 1
+        byDay.set(day, b)
+      } else if (p.type === 'message' && p.role === 'user') {
+        const day = localDay(ts)
+        const b = byDay.get(day) ?? emptyBucket()
+        b.messages += 1
+        if (st.sid) b.sessions.add(st.sid)
+        byDay.set(day, b)
+      }
+      return
+    }
+    if (obj.type === 'token_usage_record' && ts && p.usage && typeof p.usage === 'object') {
+      const respId = typeof p.response_id === 'string' ? p.response_id : null
+      if (respId !== null && st.lastResp === respId) return
+      if (respId !== null) st.lastResp = respId
+
+      const u = p.usage
+      const cached = u.cached_input_tokens ?? 0
+      // Codex's input_tokens INCLUDES cache reads; Claude's excludes them —
+      // split so the shared buckets stay comparable.
+      const usage: RawUsage = {
+        input_tokens: Math.max(0, (u.input_tokens ?? 0) - cached),
+        output_tokens: u.output_tokens ?? 0,
+        cache_creation_input_tokens: u.cache_write_input_tokens ?? 0,
+        cache_read_input_tokens: cached
+      }
+
+      const day = localDay(ts)
+      if (!firstDate || day < firstDate) firstDate = day
+      const b = byDay.get(day) ?? emptyBucket()
+      const total = addUsage(b.totals, usage)
+      b.messages += 1
+      const sid = (typeof p.session_id === 'string' ? p.session_id : undefined) ?? st.sid
+      if (sid) b.sessions.add(sid)
+      b.hours[new Date(ts).getHours()] += total
+
+      const mEntry = b.models.get(st.model) ?? { totals: zero(), family: modelFamily(st.model) }
+      addUsage(mEntry.totals, usage)
+      b.models.set(st.model, mEntry)
+
+      if (st.cwd) {
+        const pEntry = b.projects.get(st.cwd) ?? { totals: zero(), sessions: new Set<string>() }
+        addUsage(pEntry.totals, usage)
+        if (sid) pEntry.sessions.add(sid)
+        b.projects.set(st.cwd, pEntry)
+      }
+      byDay.set(day, b)
+    }
+  }
+
   // Stream each file line-by-line with bounded concurrency so memory stays flat
   // regardless of total transcript size (yours can exceed 1 GB).
   await streamFiles(files, handleLine, 4)
+  await streamFiles(codexFiles, handleCodexLine, 4)
 
-  const raw: RawBuckets = { byDay, firstDate, fileCount: files.length, generatedAt: nowMs }
+  const raw: RawBuckets = {
+    byDay,
+    firstDate,
+    fileCount: files.length + codexFiles.length,
+    generatedAt: nowMs
+  }
   rawCache = { raw, at: nowMs }
   return raw
 }
