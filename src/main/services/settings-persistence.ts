@@ -44,7 +44,7 @@ function getSettingsPath(): string {
 }
 
 function createDefaultSettings(): Settings {
-  return { defaultProjectDir: '', claudeModel: 'claude-opus-5', agentCli: '', codexModel: '', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
+  return { defaultProjectDir: '', claudeModel: 'claude-opus-5-5', agentCli: '', codexModel: '', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
 }
 
 /** True once settings.json exists — i.e. this is not a fresh install. */

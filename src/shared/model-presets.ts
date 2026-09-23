@@ -8,6 +8,7 @@ export type AgentEngine = 'claude' | 'codex'
 // own default).
 export const MODEL_PRESETS: { value: string; label: string }[] = [
   { value: 'claude-fable-5', label: 'Fable 5' },
+  { value: 'claude-opus-5-5', label: 'Opus 5.5' },
   { value: 'claude-opus-5', label: 'Opus 5' },
   { value: 'claude-opus-4-8', label: 'Opus 4.8' },
   { value: 'sonnet', label: 'Sonnet' },
