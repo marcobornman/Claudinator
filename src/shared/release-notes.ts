@@ -10,6 +10,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.29',
+    date: '2026-09-18',
+    summary: 'Opus 5.5 arrives, and the tokens dashboard learns Codex.',
+    highlights: [
+      'Claude Opus 5.5 is in the model pickers (Settings and per-card) and is the default for new installs.',
+      'The tokens dashboard and sidebar count now include Codex: GPT models get their own entries in the models chart (at $0 — it\'s your ChatGPT subscription), and tokens, tool calls, messages, and projects from Codex sessions all flow into the same view as Claude\'s.',
+      'Codex session scanning is tougher: stray files and older Codex layouts no longer blank the usage ring or break session binding.',
+      'There\'s a download page now — always pointing at the latest installer.'
+    ]
+  },
+  {
     version: '0.1.28',
     date: '2026-09-14',
     summary: 'Codex joins the board — run OpenAI\'s CLI with everything you already have.',

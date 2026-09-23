@@ -4,6 +4,16 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.29] - 2026-09-18
+
+### Added
+- Claude Opus 5.5 (`claude-opus-5-5`) in the model pickers (Settings and per-card) — and it's the default model for new installs. The model id was verified against the CLI's own binary.
+- The tokens dashboard and sidebar token count now include Codex usage: token totals come from Codex's own per-response usage records (deduplicated, cache split aligned with Claude's), GPT models appear as their own entries in the models chart (teal, costed at $0 — subscription pricing has no per-token list price), and tool calls, messages, sessions, projects, and the hourly chart are all fed from the rollouts too. Claude and Codex merge into one view.
+- A download page (GitHub Pages, `docs/`): shows the latest version and links its installer directly, always current via the GitHub API.
+
+### Fixed
+- The Codex session-file scanners no longer give up when the sessions folder contains stray files or uses an older Codex version's flat layout — the usage ring and session binding now survive both.
+
 ## [0.1.28] - 2026-09-14
 
 ### Added
