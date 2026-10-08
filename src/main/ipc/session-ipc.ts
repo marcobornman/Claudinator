@@ -5,7 +5,26 @@ import { sessionManager } from '../services/session-manager'
 import { loadSettings } from '../services/settings-persistence'
 import { resolveEngine } from '../services/agent-engine'
 
+// How often idle sessions are checked for hibernation.
+const HIBERNATE_SWEEP_MS = 10 * 60 * 1000
+
 export function registerSessionIpc(): void {
+  // Tell every window when a session is hibernated, so the renderer drops
+  // its terminal (the card stays resumable via its conversation id).
+  sessionManager.onHibernate((sessionId, cardId) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(IPC.SESSION_HIBERNATED, sessionId, cardId)
+    }
+  })
+  setInterval(async () => {
+    try {
+      const { hibernateAfterHours } = await loadSettings()
+      if (hibernateAfterHours > 0) sessionManager.hibernateIdle(hibernateAfterHours * 3600_000)
+    } catch {
+      // try again next sweep
+    }
+  }, HIBERNATE_SWEEP_MS)
+
   ipcMain.handle(
     IPC.SESSION_START,
     async (

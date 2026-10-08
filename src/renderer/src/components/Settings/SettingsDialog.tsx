@@ -97,6 +97,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
   const [claudeModel, setClaudeModel] = useState(store.claudeModel ?? '')
   const [codexModel, setCodexModel] = useState(store.codexModel ?? '')
   const [agentCli, setAgentCli] = useState<'' | 'claude' | 'codex'>(store.agentCli ?? '')
+  const [hibernateAfterHours, setHibernateAfterHours] = useState(store.hibernateAfterHours ?? 24)
   const [localRules, setLocalRules] = useState<string[]>(store.rules ?? [])
   const [localPats, setLocalPats] = useState<LocalPAT[]>(store.pats ?? [])
   const [newRule, setNewRule] = useState('')
@@ -435,6 +436,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
       claudeModel: claudeModel.trim(),
       agentCli,
       codexModel: codexModel.trim(),
+      hibernateAfterHours,
       notesDir: notesDir.trim(),
       rules: localRules,
       pats: localPats,
@@ -637,6 +639,44 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
                   )}
                   <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
                     Passed as <code>--model</code> to every new session. Applies to sessions started after saving — existing terminals keep their model.
+                  </p>
+                </div>
+
+                <div style={{ marginBottom: 24 }}>
+                  <label style={labelStyle}>Hibernate Idle Sessions</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[
+                      { value: 0, label: 'Never' },
+                      { value: 4, label: '4 hours' },
+                      { value: 12, label: '12 hours' },
+                      { value: 24, label: '1 day' },
+                      { value: 72, label: '3 days' }
+                    ].map((opt) => {
+                      const active = hibernateAfterHours === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setHibernateAfterHours(opt.value)}
+                          style={{
+                            flex: 1,
+                            borderRadius: 8,
+                            padding: '9px 12px',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            border: `1px solid ${active ? 'var(--accent)' : 'var(--border-input)'}`,
+                            backgroundColor: active ? 'var(--bg-active)' : 'var(--bg-input)',
+                            color: active ? 'var(--text-primary)' : 'var(--text-secondary)'
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                    Card sessions left untouched this long are shut down to free memory. The card keeps its conversation — click it to resume where you left off. Sessions that are working are never hibernated.
                   </p>
                 </div>
 

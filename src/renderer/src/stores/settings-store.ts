@@ -15,6 +15,7 @@ interface SettingsState {
   claudeModel: string
   agentCli: '' | 'claude' | 'codex'
   codexModel: string
+  hibernateAfterHours: number
   notesDir: string
   rules: string[]
   pats: PAT[]
@@ -90,6 +91,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
       claudeModel,
       agentCli,
       codexModel,
+      hibernateAfterHours,
       notesDir,
       rules,
       pats,
@@ -103,6 +105,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
       claudeModel,
       agentCli,
       codexModel,
+      hibernateAfterHours,
       notesDir,
       rules,
       pats,
@@ -119,6 +122,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
     claudeModel: '',
     agentCli: '',
     codexModel: '',
+    hibernateAfterHours: 24,
     notesDir: '',
     rules: [],
     pats: [],
@@ -151,6 +155,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
         claudeModel: settings.claudeModel ?? '',
         agentCli: settings.agentCli ?? '',
         codexModel: settings.codexModel ?? '',
+        hibernateAfterHours: settings.hibernateAfterHours ?? 24,
         notesDir: settings.notesDir ?? '',
         rules: settings.rules ?? [],
         pats: settings.pats ?? [],

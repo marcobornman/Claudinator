@@ -60,6 +60,9 @@ interface ManagedSession {
   engine: AgentEngine
   // Path of the codex rollout file the session is bound to (cached once found).
   codexRolloutPath?: string
+  // Last time the user typed into the session or the agent was working —
+  // drives idle hibernation.
+  lastActiveAt: number
 }
 
 class SessionManager {
@@ -68,6 +71,7 @@ class SessionManager {
   // exists before sessions do and must hear about all of them.
   private anyStatusListeners = new Set<(sessionId: string, status: SessionStatus) => void>()
   private anyResizeListeners = new Set<(sessionId: string, cols: number, rows: number) => void>()
+  private hibernateListeners = new Set<(sessionId: string, cardId: string) => void>()
 
   async start(
     cardId: string,
@@ -185,7 +189,8 @@ class SessionManager {
       statusListeners: new Set(),
       cols: 120,
       rows: 30,
-      engine
+      engine,
+      lastActiveAt: Date.now()
     }
 
     ptyProcess.onData((data) => {
@@ -260,6 +265,7 @@ class SessionManager {
   write(sessionId: string, data: string): void {
     const managed = this.sessions.get(sessionId)
     if (!managed) return
+    managed.lastActiveAt = Date.now()
     managed.ptyProcess.write(data)
   }
 
@@ -347,6 +353,32 @@ class SessionManager {
   onAnyResize(listener: (sessionId: string, cols: number, rows: number) => void): () => void {
     this.anyResizeListeners.add(listener)
     return () => this.anyResizeListeners.delete(listener)
+  }
+
+  onHibernate(listener: (sessionId: string, cardId: string) => void): () => void {
+    this.hibernateListeners.add(listener)
+    return () => this.hibernateListeners.delete(listener)
+  }
+
+  /** Shut down card sessions that have sat idle (no typing, agent not
+   *  working) for longer than maxIdleMs. The card keeps its conversation id,
+   *  so clicking it resumes where it left off. Only sessions parked at a
+   *  prompt with a known conversation are eligible — never mid-work ones,
+   *  and not notes sessions (their inline pane owns its session lifecycle). */
+  hibernateIdle(maxIdleMs: number): number {
+    const now = Date.now()
+    let count = 0
+    for (const [sessionId, managed] of this.sessions) {
+      const { status, cardId, claudeSessionId } = managed.info
+      if (status !== 'waiting' && status !== 'decision') continue
+      if (cardId.startsWith('notes:') || !claudeSessionId) continue
+      if (now - managed.lastActiveAt < maxIdleMs) continue
+      this.setStatus(managed, 'stopped')
+      for (const listener of this.hibernateListeners) listener(sessionId, cardId)
+      this.remove(sessionId)
+      count++
+    }
+    return count
   }
 
   listSessions(): SessionInfo[] {
@@ -824,6 +856,7 @@ class SessionManager {
     }
 
     this.setStatus(managed, 'running')
+    managed.lastActiveAt = Date.now()
 
     this.clearIdleTimer(managed)
     managed.idleTimer = setTimeout(() => {

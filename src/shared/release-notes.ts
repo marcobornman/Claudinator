@@ -10,6 +10,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.1.30',
+    date: '2026-10-08',
+    summary: 'Idle sessions hibernate to give your memory back.',
+    highlights: [
+      'Card sessions left untouched for a day are shut down to free memory — the CLI process, its MCP servers, and the terminal. The card keeps its conversation: click it to resume where you left off. Change the timeout (or turn it off) in Settings → General → Hibernate Idle Sessions.',
+      'Sessions that are working are never hibernated — only ones parked at a prompt.',
+      'Idle sessions now show the ■ Stop button on their card too, and clicking a stopped card resumes its conversation instead of reopening a dead terminal.'
+    ]
+  },
+  {
     version: '0.1.29',
     date: '2026-09-18',
     summary: 'Opus 5.5 arrives, and the tokens dashboard learns Codex.',
