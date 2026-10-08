@@ -34,6 +34,7 @@ export default function SessionsPanel(): JSX.Element {
   const sessions = useSessionStore((s) => s.sessions)
   const startSession = useSessionStore((s) => s.startSession)
   const openTab = useSessionStore((s) => s.openTab)
+  const removeSession = useSessionStore((s) => s.removeSession)
   const cards = useBoardStore((s) => s.cards)
   const updateCard = useBoardStore((s) => s.updateCard)
   const deleteCard = useBoardStore((s) => s.deleteCard)
@@ -52,7 +53,9 @@ export default function SessionsPanel(): JSX.Element {
 
   const handleCardClick = async (card: Card): Promise<void> => {
     const existingSession = sessionByCard.get(card.id)
-    if (card.sessionId && existingSession) {
+    // Stopped → dead terminal: drop it and resume the conversation instead.
+    if (existingSession?.status === 'stopped') removeSession(existingSession.id)
+    if (card.sessionId && existingSession && existingSession.status !== 'stopped') {
       openTab(card.sessionId)
     } else {
       try {

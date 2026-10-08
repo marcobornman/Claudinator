@@ -125,7 +125,8 @@ export function CardContent({
 }): JSX.Element {
   const tags = card.tags ?? []
   const status = getCardStatus(sessionStatus)
-  const isRunning = status === 'running'
+  // Any live session can be stopped — idle ones are the ones worth freeing.
+  const isLive = status === 'running' || status === 'waiting' || status === 'decision'
   const theme = useSettingsStore((s) => s.theme)
 
   return (
@@ -159,10 +160,10 @@ export function CardContent({
             zIndex: 10,
           }}
         >
-          {isRunning && onStop && (
+          {isLive && onStop && (
             <button
               onClick={onStop}
-              title="Stop session"
+              title="Stop session (click the card later to resume)"
               style={{
                 borderRadius: 4,
                 padding: 4,
@@ -304,6 +305,7 @@ export default function CardComponent({ card, onEdit }: CardComponentProps): JSX
   const startSession = useSessionStore((s) => s.startSession)
   const stopSession = useSessionStore((s) => s.stopSession)
   const openTab = useSessionStore((s) => s.openTab)
+  const removeSession = useSessionStore((s) => s.removeSession)
   const updateCard = useBoardStore((s) => s.updateCard)
 
   const session = card.sessionId ? sessions[card.sessionId] : null
@@ -343,7 +345,10 @@ export default function CardComponent({ card, onEdit }: CardComponentProps): JSX
   }
 
   const handleCardClick = async (): Promise<void> => {
-    if (card.sessionId && session) {
+    // A stopped session's terminal is dead — drop it and resume the
+    // conversation instead of reopening an empty tab.
+    if (card.sessionId && session?.status === 'stopped') removeSession(card.sessionId)
+    if (card.sessionId && session && session.status !== 'stopped') {
       openTab(card.sessionId)
     } else {
       try {

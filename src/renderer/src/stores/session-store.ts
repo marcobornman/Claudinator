@@ -209,6 +209,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (get().sessions[sessionId]) get().openTab(sessionId)
     })
 
+    // Main shut down an idle session to free memory. Drop it (and its
+    // terminal) entirely: the card's sessionId then points at nothing, so the
+    // card shows idle and a click resumes the conversation by its id.
+    const unsubHibernated = window.api.onSessionHibernated((sessionId) => {
+      lastNotified.delete(sessionId)
+      if (get().viewingSessionId === sessionId) set({ viewingSessionId: null })
+      get().removeSession(sessionId)
+    })
+
     const unsubClaudeId = window.api.onClaudeSessionId((sessionId, claudeConversationId) => {
       const session = get().sessions[sessionId]
       if (session) {
@@ -235,6 +244,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       unsubExit()
       unsubClaudeId()
       unsubNotifyClick()
+      unsubHibernated()
     }
   }
 }))

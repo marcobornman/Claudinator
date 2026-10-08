@@ -25,6 +25,8 @@ export interface Settings {
   agentCli: '' | 'claude' | 'codex'
   /** Default model for codex sessions ('' = codex's own default). */
   codexModel: string
+  /** Idle card sessions are shut down (resumable) after this many hours; 0 = never. */
+  hibernateAfterHours: number
   notesDir: string
   rules: string[]
   pats: PAT[]
@@ -44,7 +46,7 @@ function getSettingsPath(): string {
 }
 
 function createDefaultSettings(): Settings {
-  return { defaultProjectDir: '', claudeModel: 'claude-opus-5-5', agentCli: '', codexModel: '', notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
+  return { defaultProjectDir: '', claudeModel: 'claude-opus-5-5', agentCli: '', codexModel: '', hibernateAfterHours: 24, notesDir: '', rules: [], pats: [], theme: 'dark', themeOverrides: { dark: {}, light: {} }, customThemes: [], activeCustomThemeId: null, remote: { enabled: false, port: 8377, token: null } }
 }
 
 /** True once settings.json exists — i.e. this is not a fresh install. */

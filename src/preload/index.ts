@@ -108,6 +108,7 @@ const api = {
     claudeModel: string
     agentCli: '' | 'claude' | 'codex'
     codexModel: string
+    hibernateAfterHours: number
     notesDir: string
     rules: string[]
     pats: { id: string; name: string; value: string }[]
@@ -121,6 +122,7 @@ const api = {
     claudeModel: string
     agentCli: '' | 'claude' | 'codex'
     codexModel: string
+    hibernateAfterHours: number
     notesDir: string
     rules: string[]
     pats: { id: string; name: string; value: string }[]
@@ -338,6 +340,16 @@ const api = {
     }
     ipcRenderer.on(IPC.SESSION_CLAUDE_ID, handler)
     return () => ipcRenderer.removeListener(IPC.SESSION_CLAUDE_ID, handler)
+  },
+
+  onSessionHibernated: (
+    callback: (sessionId: string, cardId: string) => void
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, sessionId: string, cardId: string): void => {
+      callback(sessionId, cardId)
+    }
+    ipcRenderer.on(IPC.SESSION_HIBERNATED, handler)
+    return () => ipcRenderer.removeListener(IPC.SESSION_HIBERNATED, handler)
   }
 }
 
