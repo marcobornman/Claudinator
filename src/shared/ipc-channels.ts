@@ -40,6 +40,7 @@ export const IPC = {
   SETTINGS_SAVE: 'settings:save',
   SETTINGS_ADD_RULE: 'settings:add-rule',
   ENGINE_INFO: 'settings:engine-info',
+  MODEL_CATALOG: 'settings:model-catalog',
 
   // CLAUDE.md
   CLAUDE_MD_READ: 'claudemd:read',

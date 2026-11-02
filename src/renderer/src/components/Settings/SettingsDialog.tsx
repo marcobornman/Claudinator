@@ -3,7 +3,7 @@ import { useSettingsStore } from '@/stores/settings-store'
 import { useTitleBarDim } from '@/hooks/useTitleBarDim'
 import ThemeEditor from './ThemeEditor'
 import type { ThemeTemplate, ThemeOverrides, CustomTheme } from '@shared/models'
-import { presetsForEngine, formatModelName, type AgentEngine } from '@shared/model-presets'
+import { formatModelName, type AgentEngine } from '@shared/model-presets'
 
 interface SettingsDialogProps {
   onClose: () => void
@@ -136,7 +136,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
   // auto-detected one (claude unless only codex is installed).
   const autoEngine: AgentEngine = !store.claudeFound && store.codexFound ? 'codex' : 'claude'
   const localEngine: AgentEngine = agentCli === '' ? autoEngine : agentCli
-  const modelPresets = presetsForEngine(localEngine)
+  const modelPresets = store.modelsForEngine(localEngine)
   const currentModel = localEngine === 'codex' ? codexModel : claudeModel
   const setCurrentModel = localEngine === 'codex' ? setCodexModel : setClaudeModel
 
@@ -155,7 +155,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
     // Re-seed custom mode against the target engine's presets and model.
     const engine: AgentEngine = value === '' ? autoEngine : value
     const model = engine === 'codex' ? codexModel : claudeModel
-    setCustomModel(model !== '' && !presetsForEngine(engine).some((m) => m.value === model))
+    setCustomModel(model !== '' && !store.modelsForEngine(engine).some((m) => m.value === model))
   }
 
   const handleUpdateCli = async (): Promise<void> => {
@@ -171,6 +171,8 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps): JSX.El
       if (res.to) {
         setCliVersion(res.to)
         setCliMessage(`Updated ${res.from ?? ''} → ${res.to}`.trim())
+        // A new CLI can know new models — rescan the lists right away.
+        void store.refreshModelCatalog()
       } else {
         setCliMessage("You're on the latest version.")
         // Refresh the displayed version in case it was unknown before.

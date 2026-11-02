@@ -137,6 +137,10 @@ const api = {
     codexFound: boolean
     firstRun: boolean
   }> => ipcRenderer.invoke(IPC.ENGINE_INFO),
+  getModelCatalog: (): Promise<{
+    claude: { value: string; label: string }[]
+    codex: { value: string; label: string }[]
+  }> => ipcRenderer.invoke(IPC.MODEL_CATALOG),
   changeTheme: (theme: 'dark' | 'light'): Promise<void> =>
     ipcRenderer.invoke(IPC.THEME_CHANGE, theme),
   setTitleBarDim: (dimmed: boolean): Promise<void> =>

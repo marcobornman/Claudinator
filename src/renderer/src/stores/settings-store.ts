@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { ThemeTemplate, ThemeOverrides, CustomTheme } from '@shared/models'
-import type { AgentEngine } from '@shared/model-presets'
+import { MODEL_PRESETS, CODEX_MODEL_PRESETS, type AgentEngine } from '@shared/model-presets'
 
 interface PAT {
   id: string
@@ -30,6 +30,9 @@ interface SettingsState {
   codexFound: boolean
   /** Fresh install (no settings.json yet) — the agent chooser must run. */
   firstRun: boolean
+  /** Live model lists read from the installed CLIs (static presets until
+   *  loaded, and as fallback). */
+  modelCatalog: { claude: { value: string; label: string }[]; codex: { value: string; label: string }[] }
 }
 
 interface SettingsActions {
@@ -42,6 +45,9 @@ interface SettingsActions {
   removePat: (id: string) => void
   saveAll: () => Promise<void>
   refreshEngineInfo: () => Promise<void>
+  refreshModelCatalog: () => Promise<void>
+  /** The active engine's model list from the live catalog. */
+  modelsForEngine: (engine: AgentEngine) => { value: string; label: string }[]
   /** First-run chooser: persist the picked agent (creates settings.json). */
   chooseAgent: (engine: AgentEngine) => Promise<void>
   setTheme: (theme: Theme) => void
@@ -135,6 +141,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
     claudeFound: true,
     codexFound: false,
     firstRun: false,
+    modelCatalog: { claude: MODEL_PRESETS, codex: CODEX_MODEL_PRESETS },
 
     load: async () => {
       const settings = await window.api.loadSettings()
@@ -166,6 +173,23 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
         loaded: true
       })
       await get().refreshEngineInfo()
+      void get().refreshModelCatalog()
+    },
+
+    refreshModelCatalog: async () => {
+      try {
+        const catalog = await window.api.getModelCatalog()
+        if (catalog.claude.length > 0 && catalog.codex.length > 0) {
+          set({ modelCatalog: catalog })
+        }
+      } catch {
+        // keep the static presets
+      }
+    },
+
+    modelsForEngine: (engine: AgentEngine) => {
+      const { modelCatalog } = get()
+      return engine === 'codex' ? modelCatalog.codex : modelCatalog.claude
     },
 
     refreshEngineInfo: async () => {

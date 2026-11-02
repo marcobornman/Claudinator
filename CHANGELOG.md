@@ -4,12 +4,15 @@ All notable changes to Claude Code Orchestrator will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.1.30] - 2026-10-08
+## [0.1.30] - 2026-11-02
 
 ### Added
+- The model pickers (Settings and per-card) now read live model lists from the installed CLIs instead of a hardcoded list. Codex's comes from its own `models_cache.json` (hidden and retired models filtered out); Claude's is scanned from the CLI binary (2 newest versions per family, cached against the binary's mtime, so it refreshes exactly when the CLI is updated). Lists refresh at app start and right after "Check for CLI Updates"; the curated presets remain as fallback.
+- Fable 5.1 (`claude-fable-5-1`) in the fallback presets.
 - Idle session hibernation: card sessions parked at a prompt (waiting or decision) with no typing or agent activity for longer than the configured time are shut down — PTY, shell, CLI, and its MCP servers — and their terminal is dropped from the renderer. The card keeps its conversation id, so a click resumes it (`claude --resume` / `codex resume`). Swept every 10 minutes; Settings → General → Hibernate Idle Sessions (Never / 4 hours / 12 hours / 1 day / 3 days, default 1 day). Working sessions, sessions without a conversation id yet, and Notes sessions are never hibernated.
 
 ### Fixed
+- Retired `gpt-5.5` (gone 2026-10-14) and upstream-hidden `gpt-reserve` removed from the Codex presets; a saved `gpt-5.5` setting migrates to `gpt-5.6-sol` (OpenAI's named replacement) on load.
 - The card ■ Stop button now shows for idle (waiting/decision) sessions, not just running ones.
 - Clicking a card (board or Sessions view) whose session was stopped now resumes its conversation instead of reopening the dead terminal.
 
