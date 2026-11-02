@@ -4,6 +4,7 @@ import { join } from 'path'
 import { IPC } from '@shared/ipc-channels'
 import { loadSettings, saveSettings, settingsFileExists, Settings } from '../services/settings-persistence'
 import { getEngineInfo } from '../services/agent-engine'
+import { getModelCatalog } from '../services/model-catalog'
 
 export function registerSettingsIpc(): void {
   ipcMain.handle(IPC.SETTINGS_LOAD, async () => {
@@ -18,6 +19,12 @@ export function registerSettingsIpc(): void {
     // firstRun: no settings.json yet → fresh install → the renderer shows the
     // agent chooser. Upgrades have a settings file and skip it (auto-detect).
     return { ...getEngineInfo(settings.agentCli), firstRun: !settingsFileExists() }
+  })
+
+  // Live model lists read from the CLIs themselves (codex's models_cache.json;
+  // claude's binary, cached per mtime). Falls back to the static presets.
+  ipcMain.handle(IPC.MODEL_CATALOG, async () => {
+    return await getModelCatalog()
   })
 
   ipcMain.handle(IPC.SETTINGS_SAVE, async (_event, settings: Partial<Settings>) => {

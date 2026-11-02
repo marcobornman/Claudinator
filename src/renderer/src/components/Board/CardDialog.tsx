@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { Card } from '@shared/models'
-import { presetsForEngine, formatModelName } from '@shared/model-presets'
+import { formatModelName } from '@shared/model-presets'
 import { useSettingsStore } from '@/stores/settings-store'
 import { useTitleBarDim } from '@/hooks/useTitleBarDim'
 
@@ -47,7 +47,8 @@ export default function CardDialog({ card, onSave, onClose, onDelete }: CardDial
 
   // A custom model id set in Settings' "Custom…" field (or an old preset no
   // longer in the list) still needs to show up and stay selectable.
-  const modelOptions = presetsForEngine(engine).filter((m) => m.value !== '')
+  const enginePresets = useSettingsStore((s) => s.modelsForEngine(engine))
+  const modelOptions = enginePresets.filter((m) => m.value !== '')
   const unknownModel = model !== FOLLOW_SETTINGS && !modelOptions.some((m) => m.value === model)
 
   useTitleBarDim()
@@ -197,7 +198,7 @@ export default function CardDialog({ card, onSave, onClose, onDelete }: CardDial
             style={{ ...inputStyle, cursor: 'pointer' }}
           >
             <option value={FOLLOW_SETTINGS}>
-              Default — {presetsForEngine(engine).find((m) => m.value === settingsModel)?.label ?? formatModelName(settingsModel)} (Settings)
+              Default — {enginePresets.find((m) => m.value === settingsModel)?.label ?? formatModelName(settingsModel)} (Settings)
             </option>
             {modelOptions.map((m) => (
               <option key={m.value} value={m.value}>

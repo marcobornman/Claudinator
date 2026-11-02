@@ -7,6 +7,7 @@ export type AgentEngine = 'claude' | 'codex'
 // Opus 4.8 pin a specific version. '' means no --model flag (Claude Code's
 // own default).
 export const MODEL_PRESETS: { value: string; label: string }[] = [
+  { value: 'claude-fable-5-1', label: 'Fable 5.1' },
   { value: 'claude-fable-5', label: 'Fable 5' },
   { value: 'claude-opus-5-5', label: 'Opus 5.5' },
   { value: 'claude-opus-5', label: 'Opus 5' },
@@ -16,20 +17,16 @@ export const MODEL_PRESETS: { value: string; label: string }[] = [
   { value: '', label: 'Default' }
 ]
 
-// Codex model slugs (from the CLI's own model list; `codex -m <slug>`).
+// Codex model slugs (from the CLI's own model cache; `codex -m <slug>`).
+// Only models the CLI itself lists (visibility "list", not retired) belong
+// here — gpt-reserve is hidden upstream, gpt-5.5 retired 2026-10-14.
 export const CODEX_MODEL_PRESETS: { value: string; label: string }[] = [
   { value: 'gpt-6-astra', label: 'GPT-6-Astra' },
-  { value: 'gpt-reserve', label: 'GPT-Reserve' },
   { value: 'gpt-5.6-sol', label: 'GPT-5.6-Sol' },
   { value: 'gpt-5.6-terra', label: 'GPT-5.6-Terra' },
   { value: 'gpt-5.6-luna', label: 'GPT-5.6-Luna' },
-  { value: 'gpt-5.5', label: 'GPT-5.5' },
   { value: '', label: 'Default' }
 ]
-
-export function presetsForEngine(engine: AgentEngine): { value: string; label: string }[] {
-  return engine === 'codex' ? CODEX_MODEL_PRESETS : MODEL_PRESETS
-}
 
 /** True when a model id plausibly belongs to the other engine — used to drop
  *  a stale per-card override after the Agent setting was switched. */

@@ -62,7 +62,10 @@ export async function loadSettings(): Promise<Settings> {
   try {
     const raw = await readFile(filePath, 'utf-8')
     const parsed = JSON.parse(raw)
-    return { ...createDefaultSettings(), ...parsed } as Settings
+    const settings = { ...createDefaultSettings(), ...parsed } as Settings
+    // gpt-5.5 retired 2026-10-14; OpenAI's migration points at 5.6-sol.
+    if (settings.codexModel === 'gpt-5.5') settings.codexModel = 'gpt-5.6-sol'
+    return settings
   } catch {
     return createDefaultSettings()
   }

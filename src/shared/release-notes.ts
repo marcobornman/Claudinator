@@ -11,9 +11,10 @@ export interface ReleaseNote {
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
     version: '0.1.30',
-    date: '2026-10-08',
-    summary: 'Idle sessions hibernate to give your memory back.',
+    date: '2026-11-02',
+    summary: 'Idle sessions hibernate, and the model pickers stay current on their own.',
     highlights: [
+      'The model dropdowns (Settings and per-card) now come from the installed CLIs themselves, so new models appear and retired ones vanish automatically — rechecked at app start and after a CLI update. Fable 5.1 and the GPT-5.6 family are in; retired GPT-5.5 is out (a saved gpt-5.5 migrates to gpt-5.6-sol).',
       'Card sessions left untouched for a day are shut down to free memory — the CLI process, its MCP servers, and the terminal. The card keeps its conversation: click it to resume where you left off. Change the timeout (or turn it off) in Settings → General → Hibernate Idle Sessions.',
       'Sessions that are working are never hibernated — only ones parked at a prompt.',
       'Idle sessions now show the ■ Stop button on their card too, and clicking a stopped card resumes its conversation instead of reopening a dead terminal.'
